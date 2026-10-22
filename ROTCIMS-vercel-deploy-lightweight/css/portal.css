@@ -1,0 +1,744 @@
+/* ==========================================================================
+   FILE: portal.css
+   PURPOSE: Comprehensive Command-Grade UI/UX Design System for ROTCIMS
+            Administrative & Cadet Portals.
+            Features:
+            - Ergonomic Slate & Military Green palette designed for long shifts
+            - Modern elevated cards with soft ambient drop-shadows
+            - Command sidebar with icon alignment, active glow, and sleek scrollbar
+            - Live operational clock and active session status indicators
+            - High-contrast, beautifully styled data tables and filter bars
+            - Vibrant pill status badges (Present, Late, Absent, Excused, Approved)
+            - Interactive command action tiles with responsive hover physics
+            - Built-in floating Toast Notification System
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Surface & Background */
+  --portal-bg: #f8fafc;
+  --portal-card-bg: #ffffff;
+  --portal-sidebar-bg: linear-gradient(180deg, #06110a 0%, #0d2115 45%, #143321 100%);
+  --portal-border: #e2e8f0;
+  --portal-border-subtle: #f1f5f9;
+  
+  /* Typography Colors */
+  --portal-ink: #0f172a;
+  --portal-text: #334155;
+  --portal-muted: #64748b;
+  --portal-light-text: #94a3b8;
+  
+  /* Brand Military Accents */
+  --portal-primary: #153825;
+  --portal-primary-hover: #1e4d34;
+  --portal-brass: #b88e2c;
+  --portal-brass-light: #dfb54e;
+  --portal-brass-glow: rgba(184, 142, 44, 0.2);
+  
+  /* Functional Status Colors */
+  --portal-success: #15803d;
+  --portal-success-bg: #dcfce7;
+  --portal-warning: #b45309;
+  --portal-warning-bg: #fef3c7;
+  --portal-danger: #b91c1c;
+  --portal-danger-bg: #fee2e2;
+  --portal-info: #0284c7;
+  --portal-info-bg: #e0f2fe;
+
+  /* Shadows & Radiuses */
+  --portal-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --portal-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --portal-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.06);
+  --portal-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.09);
+  --portal-radius-sm: 8px;
+  --portal-radius: 12px;
+  --portal-radius-lg: 16px;
+}
+
+/* Base Body Styling */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  background-color: var(--portal-bg) !important;
+  color: var(--portal-text) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── MODERN COMMAND SIDEBAR ────────────────────────────────────────────── */
+
+.sidebar {
+  background: var(--portal-sidebar-bg) !important;
+  border-right: 1px solid rgba(184, 142, 44, 0.18) !important;
+  display: flex;
+  flex-direction: column !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15) !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(184, 142, 44, 0.3) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(184, 142, 44, 0.25);
+  border-radius: 999px;
+}
+
+.sidebar-header {
+  border-bottom: 1px solid rgba(184, 142, 44, 0.16) !important;
+  padding: 1.4rem 1.25rem !important;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.sidebar-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.sidebar-header .brand img {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 50% !important;
+  border: 2px solid var(--portal-brass) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45) !important;
+}
+
+.sidebar-header .brand-text {
+  font-family: 'Oswald', sans-serif !important;
+  letter-spacing: 0.04em !important;
+  font-size: 1.25rem !important;
+  color: #fff !important;
+  line-height: 1.15;
+}
+
+.sidebar-header .brand-text span {
+  font-size: 0.72rem !important;
+  color: var(--portal-brass-light) !important;
+  letter-spacing: 0.12em !important;
+  font-weight: 600;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Navigation Group Titles */
+.nav-group-title {
+  font-size: 0.68rem !important;
+  letter-spacing: 0.16em !important;
+  color: rgba(255, 255, 255, 0.38) !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  margin-top: 1.35rem !important;
+  margin-bottom: 0.4rem !important;
+  padding: 0 1rem !important;
+}
+
+/* Navigation Menu Links */
+.sidebar-menu {
+  list-style: none;
+  padding: 0 0.65rem !important;
+  margin: 0;
+}
+
+.sidebar-menu a {
+  border-radius: 10px !important;
+  font-size: 0.88rem !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  padding: 0.45rem 0.75rem !important;
+  margin-bottom: 5px;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.85rem !important;
+  font-weight: 500;
+  text-decoration: none;
+  position: relative;
+}
+
+/* Comfortable Tactile Icon Badge Container */
+.sidebar-menu a i {
+  width: 32px !important;
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0.92rem !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  flex-shrink: 0 !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+}
+
+.sidebar-menu a:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  padding-left: 0.95rem !important;
+}
+
+.sidebar-menu a:hover i {
+  background: rgba(184, 142, 44, 0.2) !important;
+  border-color: rgba(184, 142, 44, 0.4) !important;
+  color: var(--portal-brass-light) !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 2px 8px rgba(184, 142, 44, 0.25) !important;
+}
+
+/* Active Nav State */
+.sidebar-menu a.active {
+  background: linear-gradient(90deg, rgba(184, 142, 44, 0.2) 0%, rgba(21, 56, 37, 0.45) 100%) !important;
+  color: #f7e2a4 !important;
+  font-weight: 600 !important;
+  border-left: 3px solid var(--portal-brass) !important;
+  padding-left: calc(0.75rem - 3px) !important;
+  box-shadow: inset 0 0 14px rgba(184, 142, 44, 0.12) !important;
+}
+
+.sidebar-menu a.active i {
+  background: linear-gradient(135deg, rgba(184, 142, 44, 0.35) 0%, rgba(21, 56, 37, 0.7) 100%) !important;
+  border-color: rgba(184, 142, 44, 0.6) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 10px rgba(184, 142, 44, 0.35) !important;
+  transform: none !important;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+  border-top: 1px solid rgba(184, 142, 44, 0.14) !important;
+  background: rgba(0, 0, 0, 0.25) !important;
+  padding: 0.9rem 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-top: auto;
+}
+
+.btn-logout {
+  font-size: 0.82rem !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.18s ease !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+}
+
+.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fca5a5 !important;
+}
+
+/* ── COMMAND TOP BAR ────────────────────────────────────────────────────── */
+
+.top-bar {
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--portal-border) !important;
+  box-shadow: var(--portal-shadow-xs) !important;
+  padding: 0.85rem 1.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: sticky !important;
+  top: 0;
+  z-index: 40 !important;
+}
+
+.page-title h1 {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 1.35rem !important;
+  letter-spacing: 0.02em !important;
+  color: var(--portal-ink) !important;
+  margin: 0 0 0.15rem !important;
+  line-height: 1.2;
+}
+
+.page-title p {
+  font-size: 0.78rem !important;
+  color: var(--portal-muted) !important;
+  margin: 0;
+}
+
+/* Operational Live Clock */
+.top-bar-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--portal-text);
+  background: var(--portal-border-subtle);
+  border: 1px solid var(--portal-border);
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+/* User Identity Badge */
+.user-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+}
+
+.avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.user-badge .avatar {
+  background: linear-gradient(135deg, #153825 0%, #b88e2c 100%) !important;
+  width: 42px !important;
+  height: 42px !important;
+  font-size: 0.95rem !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+}
+
+.avatar-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background-color: #22c55e;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.user-info .name {
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  color: var(--portal-ink) !important;
+  line-height: 1.2;
+}
+
+.user-info .role-tag {
+  font-size: 0.68rem !important;
+  text-transform: uppercase !important;
+  font-weight: 800 !important;
+  color: var(--portal-brass) !important;
+  letter-spacing: 0.06em !important;
+  margin-top: 2px;
+}
+
+/* ── CONTENT BODY ───────────────────────────────────────────────────────── */
+.content-body {
+  background: var(--portal-bg) !important;
+  padding: 2rem 1.75rem !important;
+  min-height: calc(100vh - 65px);
+}
+
+/* ── METRIC CARDS GRID ──────────────────────────────────────────────────── */
+
+.metric-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+  gap: 1.25rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.metric-card {
+  background: var(--portal-card-bg) !important;
+  border: 1px solid var(--portal-border) !important;
+  border-radius: var(--portal-radius-lg) !important;
+  box-shadow: var(--portal-shadow-sm) !important;
+  padding: 1.35rem 1.5rem !important;
+  position: relative !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 1.1rem !important;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease !important;
+}
+
+.metric-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: var(--portal-shadow-lg) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3.5px;
+  background: linear-gradient(90deg, var(--portal-primary), var(--portal-brass));
+}
+
+.metric-icon {
+  border-radius: 14px !important;
+  width: 52px !important;
+  height: 52px !important;
+  display: grid !important;
+  place-items: center !important;
+  font-size: 1.45rem !important;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.metric-card:hover .metric-icon {
+  transform: scale(1.08);
+}
+
+.metric-data .value {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 2.1rem !important;
+  font-weight: 700 !important;
+  color: var(--portal-ink) !important;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.metric-data .label {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: var(--portal-muted) !important;
+  margin-bottom: 0.25rem;
+}
+
+/* ── PORTAL CARDS & CONTAINERS ──────────────────────────────────────────── */
+
+.card {
+  background: var(--portal-card-bg) !important;
+  border-radius: var(--portal-radius-lg) !important;
+  border: 1px solid var(--portal-border) !important;
+  box-shadow: var(--portal-shadow-sm) !important;
+  overflow: hidden;
+  margin-bottom: 1.75rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: var(--portal-shadow-md) !important;
+}
+
+.card-header {
+  background: #ffffff;
+  border-bottom: 1px solid var(--portal-border-subtle);
+  padding: 1.2rem 1.6rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.card-header h2, .card-header h3 {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 1.15rem !important;
+  color: var(--portal-ink) !important;
+  letter-spacing: 0.02em !important;
+  margin: 0 !important;
+}
+
+.card-header p {
+  font-size: 0.8rem;
+  color: var(--portal-muted);
+  margin: 0.2rem 0 0;
+}
+
+.card-body {
+  padding: 1.5rem 1.6rem !important;
+}
+
+/* ── COMMAND DATA TABLES ────────────────────────────────────────────────── */
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.88rem !important;
+  text-align: left;
+}
+
+.data-table th {
+  font-size: 0.72rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  color: var(--portal-muted) !important;
+  background: #f8fafc !important;
+  padding: 0.95rem 1.25rem !important;
+  border-bottom: 1px solid var(--portal-border) !important;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 1rem 1.25rem !important;
+  border-bottom: 1px solid var(--portal-border-subtle) !important;
+  color: var(--portal-ink) !important;
+  vertical-align: middle;
+}
+
+.data-table tbody tr {
+  transition: background-color 0.15s ease !important;
+}
+
+.data-table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+/* ── STATUS BADGES ──────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  font-size: 0.72rem !important;
+  padding: 0.3rem 0.75rem !important;
+  border-radius: 9999px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  line-height: 1;
+}
+
+.badge-present, .badge-approved, .badge-success {
+  background: var(--portal-success-bg) !important;
+  color: var(--portal-success) !important;
+  border: 1px solid rgba(21, 128, 61, 0.2) !important;
+}
+
+.badge-late, .badge-pending, .badge-warning {
+  background: var(--portal-warning-bg) !important;
+  color: var(--portal-warning) !important;
+  border: 1px solid rgba(180, 83, 9, 0.2) !important;
+}
+
+.badge-absent, .badge-inactive, .badge-danger {
+  background: var(--portal-danger-bg) !important;
+  color: var(--portal-danger) !important;
+  border: 1px solid rgba(185, 28, 28, 0.2) !important;
+}
+
+.badge-excused, .badge-info, .badge-admin {
+  background: var(--portal-info-bg) !important;
+  color: var(--portal-info) !important;
+  border: 1px solid rgba(2, 132, 199, 0.2) !important;
+}
+
+/* ── FILTER & SEARCH TOOLBAR ────────────────────────────────────────────── */
+
+.filter-bar {
+  background: #ffffff !important;
+  padding: 1rem 1.25rem !important;
+  border-radius: var(--portal-radius) !important;
+  border: 1px solid var(--portal-border) !important;
+  box-shadow: var(--portal-shadow-xs) !important;
+  margin-bottom: 1.5rem !important;
+  display: flex !important;
+  gap: 0.85rem !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+}
+
+.form-input, .form-select, .form-textarea, .search-input {
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: var(--portal-radius-sm) !important;
+  background: #ffffff !important;
+  font-size: 0.88rem !important;
+  color: var(--portal-ink) !important;
+  padding: 0.6rem 0.95rem !important;
+  transition: all 0.18s ease !important;
+  font-family: inherit;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus, .search-input:focus {
+  border-color: var(--portal-brass) !important;
+  box-shadow: 0 0 0 3px var(--portal-brass-glow) !important;
+  outline: none !important;
+}
+
+.form-label {
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  color: var(--portal-text) !important;
+  letter-spacing: 0.03em !important;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+/* ── BUTTONS & COMMAND ACTIONS ──────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  border-radius: var(--portal-radius-sm) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+  padding: 0.6rem 1.15rem !important;
+  transition: all 0.18s ease !important;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: scale(0.98) !important;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #153825 0%, #204d35 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(21, 56, 37, 0.2) !important;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1a442d 0%, #275d40 100%) !important;
+  box-shadow: 0 4px 14px rgba(21, 56, 37, 0.3) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-brass {
+  background: linear-gradient(135deg, #b88e2c 0%, #dfb54e 100%) !important;
+  color: #1a1a1a !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 8px rgba(184, 142, 44, 0.25) !important;
+}
+
+.btn-brass:hover {
+  background: linear-gradient(135deg, #c79a32 0%, #e6bf5f 100%) !important;
+  box-shadow: 0 4px 14px rgba(184, 142, 44, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+.btn-outline {
+  background: #ffffff !important;
+  border: 1.5px solid var(--portal-border) !important;
+  color: var(--portal-text) !important;
+}
+
+.btn-outline:hover {
+  background: var(--portal-border-subtle) !important;
+  border-color: #cbd5e1 !important;
+  color: var(--portal-ink) !important;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.8rem !important;
+  font-size: 0.78rem !important;
+}
+
+/* ── MODALS ─────────────────────────────────────────────────────────────── */
+
+.modal-content {
+  border-radius: 20px !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid var(--portal-border) !important;
+  overflow: hidden;
+}
+
+.modal-header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid var(--portal-border) !important;
+  padding: 1.25rem 1.6rem !important;
+}
+
+.modal-header h3 {
+  font-family: 'Oswald', sans-serif !important;
+  font-size: 1.25rem !important;
+  letter-spacing: 0.02em !important;
+  color: var(--portal-ink) !important;
+  margin: 0;
+}
+
+.modal-footer {
+  background: #f8fafc !important;
+  border-top: 1px solid var(--portal-border) !important;
+  padding: 1rem 1.6rem !important;
+}
+
+/* ── FLOATING TOAST FEEDBACK ────────────────────────────────────────────── */
+
+.portal-toast {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 999999;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.95rem 1.4rem;
+  border-radius: var(--portal-radius);
+  box-shadow: var(--portal-shadow-lg);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-left: 4px solid var(--portal-brass);
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.portal-toast.active {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── MOBILE MENU BUTTON ─────────────────────────────────────────────────── */
+
+.mobile-menu-btn {
+  background: #ffffff !important;
+  border: 1.5px solid var(--portal-border) !important;
+  border-radius: 8px !important;
+  color: var(--portal-ink) !important;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.mobile-menu-btn:hover {
+  background: var(--portal-border-subtle) !important;
+}
+
+/* ── RESPONSIVE ADAPTATIONS ─────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .top-bar {
+    padding: 0.75rem 1rem !important;
+  }
+  .content-body {
+    padding: 1.25rem 1rem !important;
+  }
+  .d-none-mobile {
+    display: none !important;
+  }
+  .metric-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.85rem !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

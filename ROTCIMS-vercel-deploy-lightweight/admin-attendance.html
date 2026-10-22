@@ -1,0 +1,1158 @@
+<!--
+  ============================================================
+  FILE: admin-attendance.html
+  PURPOSE: Attendance session management and manual record
+           entry page. Officers can:
+             • Create new formation drill sessions
+             • Manually enter / correct individual cadet
+               attendance status (PRESENT, LATE, EXCUSED, ABSENT)
+             • Filter the attendance log by session or status
+             • In-line update any record's status via a dropdown
+
+  ACCESS: Restricted to 'admin', 'personnel', or
+          'platoon_leader'. Auth.requireAuth() enforces this.
+
+  SUPABASE TABLES USED:
+    READ   → attendance_sessions  (populate session dropdowns)
+    READ   → profiles             (populate cadet selector; role = 'cadet')
+    READ   → attendance_records   (render filtered log table;
+                                   joined with profiles & sessions)
+    INSERT → attendance_sessions  (create new session via modal form)
+    UPSERT → attendance_records   (manual entry; onConflict on cadet+session)
+    UPDATE → attendance_records   (inline status change dropdown)
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js  — window.supabaseClient
+    js/auth.js    — Auth.requireAuth(), Auth.logout()
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Records — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+            <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html" ><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html" ><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html" class="active"><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+          <li><a href="admin-reports.html" ><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html" ><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+          <li><a href="admin-applications.html" ><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+          <li><a href="admin-personnel.html" ><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html" ><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+          <li><a href="admin-documents.html" ><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html" ><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html" ><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+        </ul>
+
+        <div class="nav-group-title">Public Front</div>
+        <ul class="sidebar-menu">
+          <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>Formation Drill Attendance Management</h1>
+            <p>Monitor formations, manually input attendance entries, and correct statuses.</p>
+          </div>
+        </div>
+
+        <!-- Logged-in user info badge -->
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">AT</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <div class="role-tag" id="user-role">Officer</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <div class="content-body">
+
+        <!-- ====== MOBILE SPEC LAYOUT (Matching Screen 2 & 4) ====== -->
+        <div class="d-none-desktop">
+
+          <!-- 1. Active Formation Session Banner Card -->
+          <div class="mobile-session-banner-card">
+            <div class="session-header-row">
+              <div class="session-title">
+                <i class="fa-solid fa-calendar-day" style="color: #133820;"></i>
+                <span id="mob-session-title">Regular Formation</span>
+              </div>
+              <span id="mob-session-badge" class="badge-ongoing">Ongoing</span>
+            </div>
+            <div class="session-time-sub" id="mob-session-time">
+              Today • 6:00 AM – 7:00 AM
+            </div>
+
+            <!-- 5 Circular Counters Strip -->
+            <div class="mobile-stat-circle-group">
+              <div class="mobile-stat-col" onclick="setAttMobileFilter('all')" style="cursor:pointer;">
+                <div class="mobile-stat-circle total"><i class="fa-solid fa-users"></i></div>
+                <div class="mobile-stat-num" id="mob-stat-total">0</div>
+                <div class="mobile-stat-label">Total</div>
+              </div>
+              <div class="mobile-stat-col" onclick="setAttMobileFilter('PRESENT')" style="cursor:pointer;">
+                <div class="mobile-stat-circle present"><i class="fa-solid fa-check"></i></div>
+                <div class="mobile-stat-num" id="mob-stat-present">0</div>
+                <div class="mobile-stat-label">Present</div>
+              </div>
+              <div class="mobile-stat-col" onclick="setAttMobileFilter('LATE')" style="cursor:pointer;">
+                <div class="mobile-stat-circle late"><i class="fa-solid fa-clock"></i></div>
+                <div class="mobile-stat-num" id="mob-stat-late">0</div>
+                <div class="mobile-stat-label">Late</div>
+              </div>
+              <div class="mobile-stat-col" onclick="setAttMobileFilter('ABSENT')" style="cursor:pointer;">
+                <div class="mobile-stat-circle absent"><i class="fa-solid fa-xmark"></i></div>
+                <div class="mobile-stat-num" id="mob-stat-absent">0</div>
+                <div class="mobile-stat-label">Absent</div>
+              </div>
+              <div class="mobile-stat-col" onclick="setAttMobileFilter('EXCUSED')" style="cursor:pointer;">
+                <div class="mobile-stat-circle excused"><i class="fa-solid fa-user"></i></div>
+                <div class="mobile-stat-num" id="mob-stat-excused">0</div>
+                <div class="mobile-stat-label">Excused</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Primary & Dual Touch Action Buttons -->
+          <a href="admin-qr-scanner.html" class="btn-touch-action-scanner">
+            <i class="fa-solid fa-qrcode"></i> Open QR Scanner
+          </a>
+          <div class="mobile-action-dual-row">
+            <button type="button" class="btn-touch-action-manual" onclick="openManualAttendanceModal()">
+              <i class="fa-solid fa-clipboard-check"></i> Manual Entry
+            </button>
+            <button type="button" class="btn-touch-action-session" onclick="openNewSessionModal()">
+              <i class="fa-solid fa-calendar-plus"></i> New Session
+            </button>
+          </div>
+
+          <!-- 3. Dedicated Mobile Search Bar -->
+          <div class="mobile-search-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="att-search-mobile" class="mobile-search-input" placeholder="Search cadet name or school ID" oninput="filterAndRenderRecords()">
+          </div>
+
+          <!-- 4. Filter Chips Row -->
+          <div class="mobile-filter-chips-row">
+            <select id="mob-chip-status" class="mobile-chip-select" onchange="onMobChipStatusChange(this.value)">
+              <option value="all">All Status ▾</option>
+              <option value="PRESENT">Present</option>
+              <option value="LATE">Late</option>
+              <option value="EXCUSED">Excused</option>
+              <option value="ABSENT">Absent</option>
+            </select>
+            <select id="mob-chip-session" class="mobile-chip-select" onchange="onMobChipSessionChange(this.value)">
+              <option value="all">All Formations ▾</option>
+            </select>
+            <select id="mob-chip-platoon" class="mobile-chip-select" onchange="onMobChipPlatoonChange(this.value)">
+              <option value="all">All Platoons ▾</option>
+              <option value="1st Platoon">1st Platoon</option>
+              <option value="2nd Platoon">2nd Platoon</option>
+              <option value="3rd Platoon">3rd Platoon</option>
+            </select>
+          </div>
+
+          <!-- 5. Roster Section Header with Export & Print links -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; padding:0 0.25rem;">
+            <div style="font-family:'Oswald',sans-serif; font-size:1.05rem; font-weight:700; color:#f8fafc;">
+              Attendance Records (<span id="mob-records-count">0</span>)
+            </div>
+            <div style="display:flex; align-items:center; gap:0.65rem;">
+              <button type="button" onclick="exportAttendanceCSV()" style="background:transparent; border:none; color:var(--brass,#dfb54e); font-size:0.82rem; font-weight:700; cursor:pointer;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> Export
+              </button>
+              <button type="button" onclick="window.print()" style="background:transparent; border:none; color:#cbd5e1; font-size:0.82rem; font-weight:700; cursor:pointer;">
+                <i class="fa-solid fa-print"></i> Print
+              </button>
+            </div>
+          </div>
+
+        </div><!-- end .d-none-desktop -->
+
+        <!-- ====== DESKTOP ACTION TOOLBAR (Hidden on Mobile) ====== -->
+        <div class="card d-none-mobile" style="padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <!-- Opens the "Create Formation Drill Session" modal -->
+              <button onclick="openNewSessionModal()" class="btn btn-primary">
+                ➕ New Formation Session
+              </button>
+              <!-- Opens the "Manual Attendance Entry" modal -->
+              <button onclick="openManualAttendanceModal()" class="btn btn-brass">
+                ✍️ Manual Attendance Entry
+              </button>
+              <!-- Navigates to the QR scanner page for camera-based scanning -->
+              <a href="admin-qr-scanner.html" class="btn btn-outline">
+                📷 Open Scanner
+              </a>
+            </div>
+
+            <!-- Filter controls & Session Management Toolbar -->
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <!-- #filter-session: filters records to a specific session.
+                   Populated by loadSessionFilter() on page load. -->
+              <div style="display: flex; align-items: center; gap: 0.35rem;">
+                <select id="filter-session" class="form-select" style="min-width: 220px;" onchange="onFilterSessionChanged()">
+                  <option value="all">All Formation Sessions</option>
+                </select>
+                <span id="att-session-status-badge" class="badge" style="display:none; font-size: 0.72rem;">🟢 OPEN</span>
+              </div>
+
+              <!-- Session Action Buttons (Active when a specific session is selected) -->
+              <div id="session-action-group" style="display: none; gap: 0.35rem;">
+                <button type="button" id="btn-att-toggle-open" onclick="toggleCurrentSessionOpen()" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" title="Toggle Open/Closed status">
+                  <i class="fa-solid fa-lock"></i> Close
+                </button>
+                <button type="button" onclick="openEditCurrentSessionModal()" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" title="Edit selected session">
+                  <i class="fa-solid fa-pen"></i> Edit
+                </button>
+                <button type="button" onclick="deleteCurrentSession()" class="btn btn-sm btn-danger" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" title="Delete selected session">
+                  <i class="fa-solid fa-trash"></i> Delete
+                </button>
+              </div>
+
+              <!-- #filter-status: filters records by attendance status value -->
+              <select id="filter-status" class="form-select" onchange="loadRecords()" style="margin-left: 0.25rem;">
+                <option value="all">All Statuses</option>
+                <option value="PRESENT">PRESENT</option>
+                <option value="LATE">LATE</option>
+                <option value="EXCUSED">EXCUSED</option>
+                <option value="ABSENT">ABSENT</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== ATTENDANCE RECORDS TABLE & MOBILE CARDS ====== -->
+        <div class="card" style="background:transparent; border:none; box-shadow:none; padding:0;">
+          <div class="card-header d-none-mobile">
+            <h3>Attendance Log Roster</h3>
+            <span id="record-count" class="badge badge-admin">0 Records</span>
+          </div>
+
+          <!-- DESKTOP TABLE VIEW -->
+          <div class="desktop-table-view table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Cadet Name</th>        <!-- profiles.last_name, first_name -->
+                  <th>Student ID</th>         <!-- profiles.student_id -->
+                  <th>Course &amp; Section</th><!-- profiles.course + section -->
+                  <th>Session / Date</th>     <!-- attendance_sessions.title -->
+                  <th>Time-In</th>            <!-- attendance_records.time_in -->
+                  <th>Method</th>             <!-- source: 'qr' or 'manual' -->
+                  <th>Status</th>             <!-- PRESENT / LATE / EXCUSED / ABSENT -->
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-tbody">
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 2rem; color: var(--slate);">Loading records...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- MOBILE CARDS VIEW -->
+          <div class="mobile-cards-view" id="attendance-mobile-cards">
+            <div style="text-align: center; padding: 2rem; color: #94a3b8;">Loading attendance cards...</div>
+          </div>
+        </div>
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== MODAL: CREATE / EDIT SESSION ====== -->
+  <div id="modal-session" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-att-session-title">Create Formation Drill Session</h3>
+        <!-- ✕ button closes all modals via closeModals() -->
+        <button class="modal-close" onclick="closeModals()">✕</button>
+      </div>
+      <!-- onsubmit calls handleSaveSession() which INSERTs or UPDATEs attendance_sessions -->
+      <form id="form-session" onsubmit="handleSaveSession(event)">
+        <input type="hidden" id="sess-edit-id">
+        <div class="modal-body">
+          <!-- Session title — e.g. "Regular Saturday Drill Day 3" -->
+          <div class="form-group">
+            <label class="form-label" for="sess-title">Session Title *</label>
+            <input type="text" id="sess-title" required class="form-input" placeholder="e.g. Regular Saturday Drill Day 3">
+          </div>
+
+          <!-- Date and location on a 2-column grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <!-- #sess-date is pre-filled with today's date in the JS init block -->
+              <label class="form-label" for="sess-date">Session Date *</label>
+              <input type="date" id="sess-date" required class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sess-location">Location</label>
+              <input type="text" id="sess-location" class="form-input" placeholder="Grandstand Parade Grounds">
+            </div>
+          </div>
+
+          <!-- Start and end times on a 2-column grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <!-- Default start time: 07:00 (standard ROTC morning formation) -->
+              <label class="form-label" for="sess-start">Start Time</label>
+              <input type="time" id="sess-start" value="07:00" class="form-input">
+            </div>
+            <div class="form-group">
+              <!-- Default end time: 12:00 (noon dismissal) -->
+              <label class="form-label" for="sess-end">End Time</label>
+              <input type="time" id="sess-end" value="12:00" class="form-input">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 0.5rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="sess-is-open" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+              <span>Session is OPEN for active QR attendance scanning</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModals()">Cancel</button>
+          <button type="submit" id="btn-att-save-session" class="btn btn-primary">Save Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====== MODAL: MANUAL ATTENDANCE ENTRY ====== -->
+  <!-- Lets officers record or correct attendance without a QR scan -->
+  <div id="modal-manual" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Manual Attendance Entry</h3>
+        <button class="modal-close" onclick="closeModals()">✕</button>
+      </div>
+      <!-- onsubmit calls handleManualEntry() which UPSERTs into attendance_records -->
+      <form id="form-manual" onsubmit="handleManualEntry(event)">
+        <div class="modal-body">
+          <!-- Select the session this manual entry belongs to -->
+          <div class="form-group">
+            <label class="form-label" for="man-session">Select Session *</label>
+            <!-- #man-session is populated by the same loadSessionFilter() call -->
+            <select id="man-session" required class="form-select"></select>
+          </div>
+
+          <!-- Select the cadet from the full enrolled cadet list -->
+          <div class="form-group">
+            <label class="form-label" for="man-cadet">Select Cadet *</label>
+            <!-- #man-cadet populated by loadCadets() — sorted alphabetically by last name -->
+            <select id="man-cadet" required class="form-select">
+              <option value="">Loading enrolled cadets...</option>
+            </select>
+          </div>
+
+          <!-- Status and time on a 2-column grid -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <!-- Status dropdown — the four valid attendance values -->
+              <label class="form-label" for="man-status">Status *</label>
+              <select id="man-status" required class="form-select">
+                <option value="PRESENT">PRESENT</option>
+                <option value="LATE">LATE</option>
+                <option value="EXCUSED">EXCUSED</option>
+                <option value="ABSENT">ABSENT</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <!-- #man-time auto-fills with the current time when the modal opens -->
+              <label class="form-label" for="man-time">Time In</label>
+              <input type="time" id="man-time" class="form-input">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModals()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Attendance</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====== PAGE LOGIC SCRIPT ====== -->
+  <script>
+    // currentOfficer — the logged-in user's profile (needed for 'recorded_by')
+    let currentOfficer = null;
+    // allCadets — full cadet list cached after loadCadets() for the dropdown
+    let allCadets = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD ──────────────────────────────────────────────────
+      // Redirect non-authorised users immediately
+      currentOfficer = await Auth.requireAuth(["admin", "personnel", "platoon_leader"]);
+      if (!currentOfficer) return;
+
+      // Pre-fill today's date in the new-session modal
+      document.getElementById("sess-date").valueAsDate = new Date();
+
+      // Load data needed for both dropdowns and the main table
+      await syncMissingCadets(); // ensure any registered cadets have a cadets table row
+      await loadSessionFilter(); // populate session <select> elements
+      await loadCadets();        // populate cadet <select> in manual entry
+      await loadRecords();       // render the main attendance table
+    });
+
+    // allSessions — cached sessions for editing/deleting/toggling
+    let allSessions = [];
+
+    // ── syncMissingCadets() ──────────────────────────────────────────────
+    // Auto-generates cadets table rows for any cadet profiles missing one.
+    // This prevents foreign key errors in the QR scanner and attendance logs.
+    async function syncMissingCadets() {
+      try {
+        const { data: profs } = await window.supabaseClient
+          .from("profiles")
+          .select("id, company, platoon, role")
+          .eq("role", "cadet");
+
+        if (profs && profs.length > 0) {
+          for (const p of profs) {
+            const { data: existing } = await window.supabaseClient
+              .from("cadets")
+              .select("id")
+              .eq("profile_id", p.id)
+              .maybeSingle();
+
+            if (!existing) {
+              await window.supabaseClient
+                .from("cadets")
+                .insert({
+                  profile_id: p.id,
+                  rotc_unit: p.company || "Alpha Company",
+                  rank: "Cadet"
+                });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("syncMissingCadets note:", e);
+      }
+    }
+
+    // ── updateMobileSessionBanner(session) ────────────────────────────────
+    function updateMobileSessionBanner(session) {
+      const s = session || allSessions.find(x => x.is_open) || allSessions[0];
+      const titleEl = document.getElementById("mob-session-title");
+      const badgeEl = document.getElementById("mob-session-badge");
+      const timeEl  = document.getElementById("mob-session-time");
+
+      if (s) {
+        if (titleEl) titleEl.textContent = s.title || "Regular Formation";
+        if (badgeEl) {
+          badgeEl.textContent = s.is_open ? "Ongoing" : "Closed";
+          badgeEl.className = s.is_open ? "badge-ongoing" : "badge-closed";
+          if (!s.is_open) {
+            badgeEl.style.background = "#64748b";
+            badgeEl.style.color = "#ffffff";
+          } else {
+            badgeEl.style.background = "";
+            badgeEl.style.color = "";
+          }
+        }
+        if (timeEl) {
+          const dateStr = s.session_date || "Today";
+          const startStr = s.start_time ? s.start_time.substring(0, 5) : "06:00";
+          const endStr = s.end_time ? s.end_time.substring(0, 5) : "07:00";
+          timeEl.textContent = `${dateStr} • ${startStr} – ${endStr}`;
+        }
+      }
+    }
+
+    // ── loadSessionFilter() ──────────────────────────────────────────────
+    // Fetches all sessions and populates filter dropdowns (#filter-session, #mob-chip-session)
+    // and the manual-entry modal dropdown (#man-session).
+    async function loadSessionFilter() {
+      const { data: sessions } = await window.supabaseClient
+        .from("attendance_sessions")
+        .select("id, title, session_date, is_open, start_time, end_time, location")
+        .order("session_date", { ascending: false }); // newest first
+
+      allSessions = sessions || [];
+
+      const selFilter  = document.getElementById("filter-session");
+      const selMan     = document.getElementById("man-session");
+      const selMobChip = document.getElementById("mob-chip-session");
+
+      if (allSessions && allSessions.length > 0) {
+        // Filter dropdown includes "All Sessions" as the default option
+        selFilter.innerHTML = '<option value="all">All Formation Sessions</option>' +
+          allSessions.map(s => `<option value="${s.id}">${s.is_open ? '🟢' : '⚪'} ${s.title} (${s.session_date})</option>`).join('');
+
+        if (selMobChip) {
+          selMobChip.innerHTML = '<option value="all">All Formations ▾</option>' +
+            allSessions.map(s => `<option value="${s.id}">${s.is_open ? '🟢' : '⚪'} ${s.title}</option>`).join('');
+        }
+        
+        // Manual entry dropdown does NOT need an "All" option — one must be chosen
+        selMan.innerHTML = allSessions.map(s => `<option value="${s.id}">${s.title} (${s.session_date})</option>`).join('');
+      } else {
+        selFilter.innerHTML = '<option value="all">No Sessions Created</option>';
+        if (selMobChip) selMobChip.innerHTML = '<option value="all">No Formations Available</option>';
+        selMan.innerHTML = '<option value="">No Sessions Available</option>';
+      }
+
+      updateMobileSessionBanner(allSessions.find(s => s.is_open) || allSessions[0]);
+    }
+
+    // ── onFilterSessionChanged() ─────────────────────────────────────────
+    // Controls the visibility and status badge of the session management toolbar
+    function onFilterSessionChanged() {
+      const selVal = document.getElementById("filter-session").value;
+      const actionGroup = document.getElementById("session-action-group");
+      const statusBadge = document.getElementById("att-session-status-badge");
+      const toggleBtn = document.getElementById("btn-att-toggle-open");
+
+      // Keep mobile chip selector in sync
+      const mobChipSess = document.getElementById("mob-chip-session");
+      if (mobChipSess && mobChipSess.value !== selVal) {
+        mobChipSess.value = selVal;
+      }
+
+      if (selVal === "all" || !selVal) {
+        if (actionGroup) actionGroup.style.display = "none";
+        if (statusBadge) statusBadge.style.display = "none";
+        updateMobileSessionBanner(allSessions.find(s => s.is_open) || allSessions[0]);
+        loadRecords();
+        return;
+      }
+
+      const session = allSessions.find(s => s.id === selVal);
+      if (session) {
+        updateMobileSessionBanner(session);
+        if (actionGroup) actionGroup.style.display = "flex";
+        if (statusBadge) {
+          statusBadge.style.display = "inline-block";
+          if (session.is_open) {
+            statusBadge.textContent = "🟢 OPEN";
+            statusBadge.className = "badge badge-approved";
+            statusBadge.style.background = "";
+          } else {
+            statusBadge.textContent = "⚪ CLOSED";
+            statusBadge.className = "badge";
+            statusBadge.style.background = "#64748b";
+            statusBadge.style.color = "#ffffff";
+          }
+        }
+
+        if (toggleBtn) {
+          if (session.is_open) {
+            toggleBtn.className = "btn btn-sm btn-outline";
+            toggleBtn.innerHTML = '<i class="fa-solid fa-lock"></i> Close Session';
+          } else {
+            toggleBtn.className = "btn btn-sm btn-brass";
+            toggleBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i> Open Session';
+          }
+        }
+      }
+      loadRecords();
+    }
+
+    // ── loadCadets() ─────────────────────────────────────────────────────
+    // Fetches all cadets (with joined profile) for the manual-entry selector
+    async function loadCadets() {
+      // Try querying cadets table joined with profiles
+      const { data: cadetRows, error } = await window.supabaseClient
+        .from("cadets")
+        .select(`
+          id, profile_id,
+          profiles ( first_name, last_name, student_id, course, section )
+        `);
+
+      if (!error && cadetRows && cadetRows.length > 0) {
+        allCadets = cadetRows;
+      } else {
+        // Fallback: load profiles with role='cadet'
+        const { data: profs } = await window.supabaseClient
+          .from("profiles")
+          .select("id, first_name, last_name, student_id, course, section")
+          .eq("role", "cadet")
+          .order("last_name", { ascending: true });
+
+        allCadets = (profs || []).map(p => ({
+          id: p.id,
+          profile_id: p.id,
+          profiles: p
+        }));
+      }
+
+      // Sort alphabetically by last name
+      allCadets.sort((a, b) => {
+        const la = (a.profiles?.last_name || '').toLowerCase();
+        const lb = (b.profiles?.last_name || '').toLowerCase();
+        return la.localeCompare(lb);
+      });
+
+      const sel = document.getElementById("man-cadet");
+      sel.innerHTML = '<option value="">-- Choose Cadet --</option>' +
+        allCadets.map(c => `<option value="${c.id}">${c.profiles?.last_name || ''}, ${c.profiles?.first_name || ''} (${c.profiles?.student_id || '---'})</option>`).join('');
+    }
+
+    // In-memory cache for attendance records & active mobile filter
+    let cachedAttendanceRecords = [];
+    let currentAttMobileFilter = 'all'; // 'all' | 'PRESENT' | 'LATE' | 'EXCUSED' | 'ABSENT'
+    let currentAttPlatoonFilter = 'all';
+
+    // ── setAttMobileFilter(status) ───────────────────────────────────────
+    function setAttMobileFilter(status) {
+      currentAttMobileFilter = status;
+      const chipStat = document.getElementById("mob-chip-status");
+      if (chipStat) chipStat.value = status;
+      filterAndRenderRecords();
+    }
+
+    function onMobChipStatusChange(val) {
+      currentAttMobileFilter = val;
+      filterAndRenderRecords();
+    }
+
+    function onMobChipSessionChange(val) {
+      const filterSess = document.getElementById("filter-session");
+      if (filterSess) filterSess.value = val;
+      onFilterSessionChanged();
+    }
+
+    function onMobChipPlatoonChange(val) {
+      currentAttPlatoonFilter = val;
+      filterAndRenderRecords();
+    }
+
+    // ── updateAttPillCounts() ────────────────────────────────────────────
+    // NOTE: Uses mob-stat-* IDs which are the actual elements in the HTML.
+    // The former att-pill-count-* IDs did not exist, causing a crash that
+    // prevented filterAndRenderRecords() from ever being called (stuck loading).
+    function updateAttPillCounts() {
+      const allCount     = cachedAttendanceRecords.length;
+      const presentCount = cachedAttendanceRecords.filter(r => (r.status || '').toUpperCase() === 'PRESENT').length;
+      const lateCount    = cachedAttendanceRecords.filter(r => (r.status || '').toUpperCase() === 'LATE').length;
+      const excusedCount = cachedAttendanceRecords.filter(r => (r.status || '').toUpperCase() === 'EXCUSED').length;
+      const absentCount  = cachedAttendanceRecords.filter(r => (r.status || '').toUpperCase() === 'ABSENT').length;
+
+      // Safe helper — no crash if element is missing on a given viewport
+      const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+      // Mobile stat numbers (mob-stat-*) — the only stat elements present in the HTML
+      setEl("mob-stat-total",   allCount);
+      setEl("mob-stat-present", presentCount);
+      setEl("mob-stat-late",    lateCount);
+      setEl("mob-stat-excused", excusedCount);
+      setEl("mob-stat-absent",  absentCount);
+    }
+
+    // ── loadRecords() ────────────────────────────────────────────────────
+    // Queries attendance_records using schema-compliant columns and joins
+    async function loadRecords() {
+      const sessFilter = document.getElementById("filter-session")?.value || "all";
+      const statFilter = document.getElementById("filter-status")?.value || "all";
+
+      let query = window.supabaseClient
+        .from("attendance_records")
+        .select(`
+          id, session_id, cadet_id, status, scanned_at, remarks,
+          attendance_sessions ( id, title, session_date ),
+          cadets (
+            id, profile_id,
+            profiles ( first_name, last_name, student_id, course, section, company, platoon )
+          )
+        `)
+        .order("scanned_at", { ascending: false });
+
+      if (sessFilter !== "all") query = query.eq("session_id", sessFilter);
+      if (statFilter !== "all") query = query.ilike("status", statFilter);
+
+      const { data: records, error } = await query;
+      if (error) {
+        if (window.showMobileToast) window.showMobileToast("Failed to load records: " + error.message, "error");
+        console.error("Error loading attendance records:", error);
+      }
+
+      cachedAttendanceRecords = records || [];
+      updateAttPillCounts();
+      filterAndRenderRecords();
+    }
+
+    // ── filterAndRenderRecords() ─────────────────────────────────────────
+    function filterAndRenderRecords() {
+      const search = (document.getElementById("att-search-mobile")?.value || "").toLowerCase().trim();
+
+      let filtered = cachedAttendanceRecords;
+
+      // Filter by mobile status pill or chip
+      if (currentAttMobileFilter && currentAttMobileFilter !== 'all') {
+        filtered = filtered.filter(r => (r.status || '').toUpperCase() === currentAttMobileFilter.toUpperCase());
+      }
+
+      // Filter by platoon chip
+      if (currentAttPlatoonFilter && currentAttPlatoonFilter !== 'all') {
+        filtered = filtered.filter(r => {
+          const profile = r.cadets?.profiles || {};
+          return (profile.platoon || '').toLowerCase().includes(currentAttPlatoonFilter.toLowerCase());
+        });
+      }
+
+      // Filter by search string
+      if (search) {
+        filtered = filtered.filter(r => {
+          const profile = r.cadets?.profiles || {};
+          const name = `${profile.first_name || ''} ${profile.last_name || ''}`.toLowerCase();
+          const sid = (profile.student_id || '').toLowerCase();
+          const sess = (r.attendance_sessions?.title || '').toLowerCase();
+          const course = (profile.course || '').toLowerCase();
+          const section = (profile.section || '').toLowerCase();
+          return name.includes(search) || sid.includes(search) || sess.includes(search) || course.includes(search) || section.includes(search);
+        });
+      }
+
+      const countEl = document.getElementById("record-count");
+      if (countEl) countEl.textContent = `${filtered.length} Records`;
+
+      const mobCountEl = document.getElementById("mob-records-count");
+      if (mobCountEl) mobCountEl.textContent = filtered.length;
+
+      renderDesktopAttendance(filtered);
+      renderMobileAttendanceCards(filtered);
+    }
+
+    // ── renderDesktopAttendance() ────────────────────────────────────────
+    function renderDesktopAttendance(records) {
+      const tbody = document.getElementById("attendance-tbody");
+      if (!tbody) return;
+
+      if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--slate);">No attendance records found matching filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = records.map(r => {
+        const profile = r.cadets?.profiles || {};
+        const fullName = `${profile.last_name || ''}, ${profile.first_name || ''}`.trim() || 'Cadet';
+        const studentId = profile.student_id || '---';
+        const courseSec = `${profile.course || ''} ${profile.section || ''}`.trim() || 'ROTC';
+        const sessionTitle = r.attendance_sessions?.title || 'Drill Session';
+        const timeIn = r.scanned_at ? new Date(r.scanned_at).toLocaleTimeString('en-PH', { hour12: false }) : (r.created_at ? new Date(r.created_at).toLocaleTimeString('en-PH', { hour12: false }) : '---');
+        const status = (r.status || 'present').toUpperCase();
+        const source = 'qr'; // source column not in schema — default display
+
+        return `
+          <tr>
+            <td><strong>${fullName}</strong></td>
+            <td style="font-family: monospace;">${studentId}</td>
+            <td style="font-size: 0.8rem;">${courseSec}</td>
+            <td>${sessionTitle}</td>
+            <td style="font-family: monospace;">${timeIn}</td>
+            <td><span class="badge badge-admin">${source}</span></td>
+            <td><span class="badge badge-${status.toLowerCase()}">${status}</span></td>
+            <td style="text-align: right;">
+              <select onchange="updateStatus('${r.id}', this.value)" style="padding: 0.25rem; font-size: 0.75rem; border-radius: 4px; border: 1px solid var(--mist);">
+                <option value="present" ${status === 'PRESENT' ? 'selected' : ''}>PRESENT</option>
+                <option value="late" ${status === 'LATE' ? 'selected' : ''}>LATE</option>
+                <option value="excused" ${status === 'EXCUSED' ? 'selected' : ''}>EXCUSED</option>
+                <option value="absent" ${status === 'ABSENT' ? 'selected' : ''}>ABSENT</option>
+              </select>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ── renderMobileAttendanceCards() ────────────────────────────────────
+    function renderMobileAttendanceCards(records) {
+      const container = document.getElementById("attendance-mobile-cards");
+      if (!container) return;
+
+      if (records.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8; font-size: 0.9rem;">
+            <i class="fa-solid fa-clipboard-question" style="font-size: 2rem; color: var(--brass, #b88e2c); margin-bottom: 0.5rem; display: block;"></i>
+            No attendance records found for this filter.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = records.map(r => {
+        const profile = r.cadets?.profiles || {};
+        const first = profile.first_name || '';
+        const last = profile.last_name || 'Cadet';
+        const initials = ((first[0] || '') + (last[0] || 'C')).toUpperCase();
+        const fullName = `${first} ${last}`.trim() || 'Cadet';
+        const studentId = profile.student_id ? `ID: ${profile.student_id}` : 'No ID';
+        const courseSec = `${profile.course || ''} ${profile.section || ''}`.trim();
+        const sessionTitle = r.attendance_sessions?.title || 'Formation Drill';
+        const timeIn = r.scanned_at ? `🕒 ${new Date(r.scanned_at).toLocaleTimeString('en-PH', { hour12: false })}` : (r.created_at ? `🕒 ${new Date(r.created_at).toLocaleTimeString('en-PH', { hour12: false })}` : 'No time-in');
+        const status = (r.status || 'present').toUpperCase();
+        const method = 'QR'; // source column not in schema
+
+        let statusClass = 'approved';
+        if (status === 'LATE') statusClass = 'pending';
+        else if (status === 'ABSENT') statusClass = 'rejected';
+        else if (status === 'EXCUSED') statusClass = 'pending';
+
+        return `
+          <div class="mobile-cadet-card">
+            <div class="mobile-cadet-card-header">
+              <div class="mobile-cadet-avatar">${initials}</div>
+              <div class="mobile-cadet-info">
+                <div class="mobile-cadet-name">${fullName}</div>
+                <div class="mobile-cadet-meta">${studentId} ${courseSec ? '• ' + courseSec : ''}</div>
+                <div class="mobile-cadet-section" style="color: #6ee7b7;"><i class="fa-solid fa-flag"></i> ${sessionTitle}</div>
+                <div class="mobile-cadet-meta" style="margin-top: 0.2rem;">${timeIn} • Method: <strong>${method}</strong></div>
+              </div>
+              <div class="mobile-cadet-badges">
+                <span class="badge-touch-status ${statusClass}">${status}</span>
+              </div>
+            </div>
+
+            <!-- Handheld Status Quick-Changer -->
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:0.75rem; padding-top:0.65rem; border-top:1px solid rgba(255,255,255,0.08);">
+              <span style="font-size:0.75rem; color:#94a3b8; font-weight:600;">Status Action:</span>
+              <select onchange="updateStatus('${r.id}', this.value)" style="background:#08180f; color:#fef08a; border:1px solid var(--brass, #b88e2c); border-radius:8px; padding:0.4rem 0.75rem; font-size:0.8rem; font-weight:700; outline:none;">
+                <option value="present" ${status === 'PRESENT' ? 'selected' : ''}>✓ PRESENT</option>
+                <option value="late" ${status === 'LATE' ? 'selected' : ''}>⏳ LATE</option>
+                <option value="excused" ${status === 'EXCUSED' ? 'selected' : ''}>📋 EXCUSED</option>
+                <option value="absent" ${status === 'ABSENT' ? 'selected' : ''}>✕ ABSENT</option>
+              </select>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── updateStatus(recordId, newStatus) ────────────────────────────────
+    // UPDATEs only the status and updated_at columns for the given record
+    async function updateStatus(recordId, newStatus) {
+      const dbStatus = newStatus.toLowerCase();
+      const { error } = await window.supabaseClient
+        .from("attendance_records")
+        .update({ status: dbStatus })
+        .eq("id", recordId);
+
+      if (error) {
+        if (window.showMobileToast) window.showMobileToast("Failed: " + error.message, "error");
+        else alert("Failed to update status: " + error.message);
+      } else {
+        const item = cachedAttendanceRecords.find(r => r.id === recordId);
+        if (item) item.status = dbStatus;
+        updateAttPillCounts();
+        filterAndRenderRecords();
+        if (window.showMobileToast) {
+          window.showMobileToast(`Status updated to ${newStatus.toUpperCase()}`, "success");
+        }
+      }
+    }
+
+    // ── Session Management Functions ────────────────────────────────────
+    function openNewSessionModal() {
+      document.getElementById("modal-att-session-title").textContent = "Create Formation Drill Session";
+      document.getElementById("sess-edit-id").value = "";
+      document.getElementById("sess-title").value = "";
+      document.getElementById("sess-date").value = new Date().toISOString().split('T')[0];
+      document.getElementById("sess-location").value = "Grandstand Parade Grounds";
+      document.getElementById("sess-start").value = "07:00";
+      document.getElementById("sess-end").value = "12:00";
+      document.getElementById("sess-is-open").checked = true;
+      document.getElementById("modal-session").classList.add("active");
+    }
+
+    function openEditCurrentSessionModal() {
+      const currentId = document.getElementById("filter-session").value;
+      const session = allSessions.find(s => s.id === currentId);
+      if (!session) {
+        alert("Please select a session from the dropdown to edit.");
+        return;
+      }
+
+      document.getElementById("modal-att-session-title").textContent = "Edit Formation Drill Session";
+      document.getElementById("sess-edit-id").value = session.id;
+      document.getElementById("sess-title").value = session.title || "";
+      document.getElementById("sess-date").value = session.session_date || "";
+      document.getElementById("sess-location").value = session.location || "";
+      document.getElementById("sess-start").value = session.start_time || "07:00";
+      document.getElementById("sess-end").value = session.end_time || "12:00";
+      document.getElementById("sess-is-open").checked = !!session.is_open;
+      document.getElementById("modal-session").classList.add("active");
+    }
+
+    async function toggleCurrentSessionOpen() {
+      const currentId = document.getElementById("filter-session").value;
+      const session = allSessions.find(s => s.id === currentId);
+      if (!session) return;
+
+      const nextState = !session.is_open;
+      const actionWord = nextState ? "OPEN" : "CLOSE";
+      if (!confirm(`Are you sure you want to ${actionWord} session "${session.title}"?`)) {
+        return;
+      }
+
+      try {
+        const { error } = await window.supabaseClient
+          .from("attendance_sessions")
+          .update({ is_open: nextState })
+          .eq("id", session.id);
+
+        if (error) throw error;
+
+        session.is_open = nextState;
+        await loadSessionFilter();
+        document.getElementById("filter-session").value = session.id;
+        onFilterSessionChanged();
+      } catch (err) {
+        console.error("Toggle session status error:", err);
+        alert("Failed to toggle session: " + err.message);
+      }
+    }
+
+    async function deleteCurrentSession() {
+      const currentId = document.getElementById("filter-session").value;
+      const session = allSessions.find(s => s.id === currentId);
+      if (!session) return;
+
+      if (!confirm(`⚠️ DANGER: Are you sure you want to delete session "${session.title}" (${session.session_date})?\n\nThis will permanently remove the drill session and all associated cadet attendance records.`)) {
+        return;
+      }
+
+      try {
+        // Delete child attendance records first
+        await window.supabaseClient
+          .from("attendance_records")
+          .delete()
+          .eq("session_id", session.id);
+
+        // Delete session
+        const { error } = await window.supabaseClient
+          .from("attendance_sessions")
+          .delete()
+          .eq("id", session.id);
+
+        if (error) throw error;
+
+        alert(`Session "${session.title}" has been deleted.`);
+        await loadSessionFilter();
+      } catch (err) {
+        console.error("Delete session error:", err);
+        alert("Failed to delete session: " + err.message);
+      }
+    }
+
+    // ── handleSaveSession(e) ──────────────────────────────────────────────
+    // Handles both INSERT and UPDATE for attendance_sessions with schema fallback
+    async function handleSaveSession(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById("btn-att-save-session");
+      if (saveBtn) saveBtn.disabled = true;
+
+      const editId = document.getElementById("sess-edit-id").value.trim();
+      const title = document.getElementById("sess-title").value.trim();
+      const session_date = document.getElementById("sess-date").value;
+      const location = document.getElementById("sess-location").value.trim();
+      const start_time = document.getElementById("sess-start").value;
+      const end_time = document.getElementById("sess-end").value;
+      const is_open = document.getElementById("sess-is-open").checked;
+
+      const fullPayload = {
+        title,
+        session_date,
+        location: location || null,
+        start_time: start_time || null,
+        end_time: end_time || null,
+        is_open,
+        status: is_open ? "active" : "closed"
+      };
+
+      try {
+        let error = null;
+        if (editId) {
+          // UPDATE
+          const res = await window.supabaseClient
+            .from("attendance_sessions")
+            .update(fullPayload)
+            .eq("id", editId);
+          error = res.error;
+
+          if (error && (error.message.includes("end_time") || error.message.includes("location") || error.message.includes("status"))) {
+            const basePayload = { title, session_date, is_open };
+            const retryRes = await window.supabaseClient
+              .from("attendance_sessions")
+              .update(basePayload)
+              .eq("id", editId);
+            error = retryRes.error;
+          }
+        } else {
+          // INSERT
+          fullPayload.created_by = currentOfficer?.id || null;
+          const res = await window.supabaseClient
+            .from("attendance_sessions")
+            .insert(fullPayload)
+            .select();
+          error = res.error;
+
+          if (error && (error.message.includes("end_time") || error.message.includes("location") || error.message.includes("status"))) {
+            const basePayload = {
+              title,
+              session_date,
+              is_open,
+              created_by: currentOfficer?.id || null,
+            };
+            const retryRes = await window.supabaseClient
+              .from("attendance_sessions")
+              .insert(basePayload)
+              .select();
+            error = retryRes.error;
+          }
+        }
+
+        if (error) throw error;
+
+        alert(`Formation session ${editId ? 'updated' : 'created'} successfully.`);
+        closeModals();
+        await loadSessionFilter();
+        if (editId) {
+          document.getElementById("filter-session").value = editId;
+          onFilterSessionChanged();
+        }
+      } catch (err) {
+        console.error("Save session error:", err);
+        alert("Error saving session: " + err.message);
+      } finally {
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    }
+
+    // ── handleManualEntry(e) ─────────────────────────────────────────────
+    // Reads manual-entry form fields and upserts with schema-valid columns
+    async function handleManualEntry(e) {
+      e.preventDefault();
+      const session_id = document.getElementById("man-session").value;
+      const selectedCadetKey = document.getElementById("man-cadet").value;
+      const status = (document.getElementById("man-status").value || "present").toLowerCase();
+      const timeVal = document.getElementById("man-time").value || "07:00";
+
+      if (!session_id || !selectedCadetKey) {
+        alert("Please select both a session and a cadet.");
+        return;
+      }
+
+      // Resolve the actual public.cadets.id
+      let actualCadetId = selectedCadetKey;
+      const chosen = allCadets.find(c => c.id === selectedCadetKey);
+      if (chosen && chosen.profile_id) {
+        try {
+          const { data: existing } = await window.supabaseClient
+            .from("cadets")
+            .select("id")
+            .eq("profile_id", chosen.profile_id)
+            .maybeSingle();
+
+          if (existing) {
+            actualCadetId = existing.id;
+          } else {
+            const { data: inserted } = await window.supabaseClient
+              .from("cadets")
+              .insert({ profile_id: chosen.profile_id, rotc_unit: "Alpha Company", rank: "Cadet" })
+              .select("id")
+              .single();
+            if (inserted) actualCadetId = inserted.id;
+          }
+        } catch (err) {
+          console.warn("Could not check/insert cadet record:", err);
+        }
+      }
+
+      const sessionObj = allSessions.find(s => s.id === session_id);
+      const sessDate = sessionObj?.session_date || new Date().toISOString().split('T')[0];
+      const scanned_at = `${sessDate}T${timeVal}:00`;
+
+      const { error } = await window.supabaseClient
+        .from("attendance_records")
+        .upsert({
+          session_id,
+          cadet_id: actualCadetId,
+          status,
+          scanned_at: new Date(scanned_at).toISOString(),
+          recorded_by: currentOfficer?.id || null,
+        }, { onConflict: "session_id,cadet_id" });
+
+      if (error) {
+        if (window.showMobileToast) window.showMobileToast("Manual entry error: " + error.message, "error");
+        else alert("Error recording manual entry: " + error.message);
+      } else {
+        if (window.showMobileToast) window.showMobileToast("Attendance recorded successfully!", "success");
+        else alert("Attendance recorded successfully.");
+        closeModals();
+        await loadRecords();
+      }
+    }
+  </script>
+</body>
+</html>

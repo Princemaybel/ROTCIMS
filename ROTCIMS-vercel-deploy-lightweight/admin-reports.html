@@ -1,0 +1,469 @@
+<!--
+  ============================================================
+  FILE: admin-reports.html
+  PURPOSE: Official attendance ledger / report generator.
+           Officers filter records by formation session,
+           company, and platoon, then view live summary
+           metrics (total, present, late, turnout %).
+           The same table renders as a printable military
+           roster with unit header and three-signature block
+           when window.print() is called.
+           Data can also be exported as a CSV file.
+
+  ACCESS: Restricted to 'admin', 'personnel', or
+          'platoon_leader'. Auth.requireAuth() enforces this.
+
+  SUPABASE TABLES USED:
+    READ → attendance_sessions  (populate session filter)
+    READ → attendance_records   (main report data; joined with
+                                 profiles & attendance_sessions)
+
+  PRINT BEHAVIOUR:
+    @media print CSS hides the sidebar, filter card, and metric
+    cards. It reveals the military print-header and signature-
+    block elements that are hidden during normal browsing.
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js, js/auth.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Reports — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+
+  <!-- ====== PRINT STYLES ====== -->
+  <style>
+    /* When the browser prints (Ctrl+P or window.print()):
+       • Reveal the military document header and signature block
+       • Add a border to the table for cleaner printed output */
+    @media print {
+      .print-header { display: block !important; text-align: center; margin-bottom: 2rem; }
+      .signature-block { display: flex !important; justify-content: space-between; margin-top: 3.5rem; }
+      .print-border { border: 1px solid #000 !important; }
+    }
+    /* Hide print-only elements during normal screen viewing */
+    .print-header, .signature-block { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+            <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html" ><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html" ><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html" ><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+          <li><a href="admin-reports.html" class="active"><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html" ><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+          <li><a href="admin-applications.html" ><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+          <li><a href="admin-personnel.html" ><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html" ><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+          <li><a href="admin-documents.html" ><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html" ><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html" ><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+        </ul>
+
+        <div class="nav-group-title">Public Front</div>
+        <ul class="sidebar-menu">
+          <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>Official Attendance Reports &amp; Ledgers</h1>
+            <p>Generate AFP &amp; DepEd compliant formation attendance rosters and CSV exports.</p>
+          </div>
+        </div>
+
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">RP</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <div class="role-tag" id="user-role">Officer</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <div class="content-body">
+        
+        <!-- ====== FILTER CARD (no-print hides on print) ====== -->
+        <!-- All three dropdowns call generateReport() on change so
+             the table and metric cards update instantly. -->
+        <div class="card no-print" style="padding: 1.25rem;">
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+
+            <!-- Session filter: "All Formations" or a specific session -->
+            <div style="flex: 1; min-width: 220px;">
+              <label class="form-label" for="report-session">Formation Drill Session</label>
+              <!-- #report-session populated by loadSessionFilter() from attendance_sessions -->
+              <select id="report-session" class="form-select" onchange="generateReport()">
+                <option value="all">All Formations</option>
+              </select>
+            </div>
+
+            <!-- Company filter — applied client-side against profiles.company -->
+            <div style="min-width: 150px;">
+              <label class="form-label" for="report-company">Company</label>
+              <select id="report-company" class="form-select" onchange="generateReport()">
+                <option value="all">All Companies</option>
+                <option value="Alpha">Alpha Company</option>
+                <option value="Bravo">Bravo Company</option>
+                <option value="Charlie">Charlie Company</option>
+              </select>
+            </div>
+
+            <!-- Platoon filter — applied client-side against profiles.platoon -->
+            <div style="min-width: 150px;">
+              <label class="form-label" for="report-platoon">Platoon</label>
+              <select id="report-platoon" class="form-select" onchange="generateReport()">
+                <option value="all">All Platoons</option>
+                <option value="1st Platoon">1st Platoon</option>
+                <option value="2nd Platoon">2nd Platoon</option>
+                <option value="3rd Platoon">3rd Platoon</option>
+              </select>
+            </div>
+
+            <!-- Export buttons -->
+            <div style="display: flex; gap: 0.5rem;">
+              <!-- exportCSV() builds a data-URI CSV from the current reportData array -->
+              <button onclick="exportCSV()" class="btn btn-primary">
+                📊 Export to CSV
+              </button>
+              <!-- window.print() triggers the browser's print dialog.
+                   The @media print CSS then hides the UI chrome and shows the ledger header. -->
+              <button onclick="window.print()" class="btn btn-brass">
+                🖨️ Print Ledger
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== METRIC SUMMARY CARDS (no-print hides on print) ====== -->
+        <!-- Four cards derived from the current filtered reportData array.
+             These give a quick readout before the officer prints. -->
+        <div class="metric-grid no-print">
+          <!-- Total records matching current filters -->
+          <div class="metric-card">
+            <div class="metric-icon">👥</div>
+            <div class="metric-data">
+              <div class="label">Total Roster Count</div>
+              <div class="value" id="rep-total">0</div>
+            </div>
+          </div>
+          <!-- Count of records with status = 'PRESENT' -->
+          <div class="metric-card">
+            <div class="metric-icon" style="color: var(--success); background: var(--success-bg);">✅</div>
+            <div class="metric-data">
+              <div class="label">Present Cadets</div>
+              <div class="value" id="rep-present">0</div>
+            </div>
+          </div>
+          <!-- Count of records with status = 'LATE' -->
+          <div class="metric-card">
+            <div class="metric-icon" style="color: var(--warning); background: var(--warning-bg);">⏰</div>
+            <div class="metric-data">
+              <div class="label">Late Arrivals</div>
+              <div class="value" id="rep-late">0</div>
+            </div>
+          </div>
+          <!-- Turnout % = (present + late) / total × 100 -->
+          <div class="metric-card">
+            <div class="metric-icon" style="color: var(--brass); background: var(--brass-subtle);">📈</div>
+            <div class="metric-data">
+              <div class="label">Turnout Percentage</div>
+              <div class="value" id="rep-rate">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== PRINTABLE DOCUMENT WRAPPER ====== -->
+        <!-- This <div> contains both the screen table AND the print-only elements.
+             Everything outside it is hidden during printing by the @media print rule. -->
+        <div class="card" style="padding: 1.5rem;">
+          
+          <!-- ====== MILITARY PRINT HEADER (screen: hidden, print: visible) ====== -->
+          <!-- This block mimics an official AFP-style document heading.
+               Shown ONLY when printing; invisible during regular use. -->
+          <div class="print-header">
+            <p style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">HEADQUARTERS, SAN ENRIQUE ROTC UNIT</p>
+            <p style="font-size: 0.75rem; text-transform: uppercase;">DEPARTMENT OF MILITARY SCIENCE AND TACTICS</p>
+            <h2 style="font-size: 1.25rem; margin-top: 0.5rem; text-decoration: underline;">OFFICIAL ROSTER OF ATTENDANCE &amp; PARADE DRILL RECORD</h2>
+            <!-- #print-meta-text could be updated dynamically with the session name -->
+            <p style="font-size: 0.8rem; margin-top: 0.25rem;" id="print-meta-text">Session: Regular Drill Formation</p>
+          </div>
+
+          <!-- ====== REPORT TABLE ====== -->
+          <!-- print-border class adds a solid 1px border when printed -->
+          <div class="table-responsive">
+            <table class="data-table print-border">
+              <thead>
+                <tr>
+                  <th>#</th>                    <!-- Row number for the printed ledger -->
+                  <th>Cadet Name</th>           <!-- profiles.last_name, first_name -->
+                  <th>Student ID</th>           <!-- profiles.student_id -->
+                  <th>Course &amp; Section</th> <!-- profiles.course + section -->
+                  <th>Unit (Co / Plt)</th>      <!-- profiles.company + platoon -->
+                  <th>Time-In</th>              <!-- attendance_records.time_in -->
+                  <th>Method</th>               <!-- source: qr or manual -->
+                  <th>Status</th>               <!-- PRESENT / LATE / EXCUSED / ABSENT -->
+                </tr>
+              </thead>
+              <!-- #report-tbody populated by generateReport() -->
+              <tbody id="report-tbody">
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 2rem; color: var(--slate);">Loading attendance ledger...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- ====== SIGNATURE BLOCK (screen: hidden, print: visible) ====== -->
+          <!-- Three signature lines required for an official AFP drill report.
+               The underscored lines are created with border-bottom on empty <p> tags. -->
+          <div class="signature-block">
+            <!-- Duty officer / platoon leader signs first -->
+            <div style="text-align: center; width: 220px;">
+              <p style="border-bottom: 1px solid #000; padding-bottom: 2rem;"></p>
+              <p style="font-weight: 700; font-size: 0.85rem; margin-top: 0.4rem;">PLATOON LEADER</p>
+              <p style="font-size: 0.72rem; color: var(--slate);">Prepared by / Duty Officer</p>
+            </div>
+
+            <!-- S1 Adjutant / clerk certifies accuracy -->
+            <div style="text-align: center; width: 220px;">
+              <p style="border-bottom: 1px solid #000; padding-bottom: 2rem;"></p>
+              <p style="font-weight: 700; font-size: 0.85rem; margin-top: 0.4rem;">S1 ADJUTANT / CLERK</p>
+              <p style="font-size: 0.72rem; color: var(--slate);">Attested by</p>
+            </div>
+
+            <!-- Commandant / DMST officer gives final approval -->
+            <div style="text-align: center; width: 220px;">
+              <p style="border-bottom: 1px solid #000; padding-bottom: 2rem;"></p>
+              <p style="font-weight: 700; font-size: 0.85rem; margin-top: 0.4rem;">COMMANDANT / DMST OFFICER</p>
+              <p style="font-size: 0.72rem; color: var(--slate);">Approved by</p>
+            </div>
+          </div>
+
+        </div><!-- end printable document wrapper -->
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== REPORT LOGIC SCRIPT ====== -->
+  <script>
+    // reportData — the currently filtered attendance records array.
+    // Stored at module scope so exportCSV() can access the same data
+    // without making a second Supabase query.
+    let reportData = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD ──────────────────────────────────────────────────
+      const officer = await Auth.requireAuth(["admin", "personnel", "platoon_leader"]);
+      if (!officer) return;
+
+      await loadSessionFilter(); // fill the session dropdown
+      await generateReport();    // render the initial full report (all sessions)
+    });
+
+    // ── loadSessionFilter() ──────────────────────────────────────────────
+    // Populates the #report-session <select> with all attendance sessions.
+    async function loadSessionFilter() {
+      const { data: sessions } = await window.supabaseClient
+        .from("attendance_sessions")
+        .select("id, title, session_date")
+        .order("session_date", { ascending: false }); // newest first
+
+      const sel = document.getElementById("report-session");
+      if (sessions && sessions.length > 0) {
+        sel.innerHTML = '<option value="all">All Formations</option>' +
+          sessions.map(s => `<option value="${s.id}">${s.title} (${s.session_date})</option>`).join('');
+      }
+    }
+
+    // ── generateReport() ─────────────────────────────────────────────────
+    // Called on page load and whenever any filter dropdown changes.
+    // 1. Queries attendance_records from Supabase (with optional session filter)
+    // 2. Applies company/platoon filters in JavaScript (joined columns cannot
+    //    be filtered server-side with a simple .eq())
+    // 3. Computes summary metrics
+    // 4. Renders the report table rows
+    async function generateReport() {
+      const sess = document.getElementById("report-session").value;
+      const comp = document.getElementById("report-company").value;
+      const plt = document.getElementById("report-platoon").value;
+
+      // Build the Supabase query with all necessary joined columns
+      let query = window.supabaseClient
+        .from("attendance_records")
+        .select(`
+          id, session_id, cadet_id, status, scanned_at,
+          attendance_sessions ( title, session_date ),
+          cadets (
+            id, profile_id,
+            profiles ( first_name, last_name, student_id, course, section, company, platoon )
+          )
+        `)
+        .order("scanned_at", { ascending: false });
+
+      // Add session filter at the database level (efficient)
+      if (sess !== "all") query = query.eq("session_id", sess);
+
+      const { data: records, error } = await query;
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      // Company and platoon filters are applied in JavaScript
+      reportData = (records || []).filter(r => {
+        const profile = r.cadets?.profiles || {};
+        const matchComp = comp === "all" || profile.company === comp;
+        const matchPlt = plt === "all" || profile.platoon === plt;
+        return matchComp && matchPlt;
+      });
+
+      // ── Compute summary metrics ─────────────────────────────────────────
+      const total = reportData.length;
+      const present = reportData.filter(r => (r.status || '').toUpperCase() === 'PRESENT').length;
+      const late = reportData.filter(r => (r.status || '').toUpperCase() === 'LATE').length;
+      // Turnout includes both on-time and late cadets
+      const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+
+      // Push values to metric card elements
+      document.getElementById("rep-total").textContent = total;
+      document.getElementById("rep-present").textContent = present;
+      document.getElementById("rep-late").textContent = late;
+      document.getElementById("rep-rate").textContent = `${rate}%`;
+
+      const tbody = document.getElementById("report-tbody");
+      if (reportData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--slate);">No attendance entries match this report criteria.</td></tr>';
+        return;
+      }
+
+      // Render numbered table rows
+      tbody.innerHTML = reportData.map((r, idx) => {
+        const profile = r.cadets?.profiles || {};
+        const fullName = `${profile.last_name || ''}, ${profile.first_name || ''}`.trim() || 'Cadet';
+        const timeIn = r.scanned_at ? new Date(r.scanned_at).toLocaleTimeString('en-PH', { hour12: false }) : (r.created_at ? new Date(r.created_at).toLocaleTimeString('en-PH', { hour12: false }) : '---');
+        const status = (r.status || 'present').toUpperCase();
+
+        return `
+          <tr>
+            <td>${idx + 1}</td>
+            <td><strong>${fullName}</strong></td>
+            <td style="font-family: monospace;">${profile.student_id || '---'}</td>
+            <td>${profile.course || ''} (${profile.section || 'N/A'})</td>
+            <td>${profile.company || '---'} • ${profile.platoon || ''}</td>
+            <td style="font-family: monospace;">${timeIn}</td>
+            <td>qr</td>
+            <td><span class="badge badge-${status.toLowerCase()}">${status}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ── exportCSV() ──────────────────────────────────────────────────────
+    // Converts the current reportData array into a CSV file and triggers
+    // a browser download. No server-side processing needed.
+    function exportCSV() {
+      if (reportData.length === 0) {
+        alert("No records to export.");
+        return;
+      }
+
+      // Column headers for the CSV file
+      const headers = ["No.", "Last Name", "First Name", "Student ID", "Course", "Section", "Company", "Platoon", "Session Date", "Time In", "Method", "Status"];
+
+      // Map each record to a CSV row array.
+      // Values are wrapped in double-quotes to handle commas within field values.
+      const rows = reportData.map((r, i) => [
+        i + 1,
+        `"${r.profiles?.last_name || ''}"`,
+        `"${r.profiles?.first_name || ''}"`,
+        `"${r.profiles?.student_id || ''}"`,
+        `"${r.profiles?.course || ''}"`,
+        `"${r.profiles?.section || ''}"`,
+        `"${r.profiles?.company || ''}"`,
+        `"${r.profiles?.platoon || ''}"`,
+        `"${r.date || ''}"`,
+        `"${r.time_in || ''}"`,
+        `"${r.source || 'qr'}"`,
+        `"${r.status || ''}"`
+      ]);
+
+      // Build the data URI — browser treats "data:text/csv" as a downloadable file
+      const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+
+      // Create an invisible <a> element, click it to trigger download, then remove it
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      // Filename includes today's date for easy filing
+      link.setAttribute("download", `ROTC_Attendance_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>

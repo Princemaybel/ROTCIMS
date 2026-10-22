@@ -1,0 +1,2015 @@
+<!DOCTYPE html>
+<!--
+  FILE: admin-posting.html
+  PURPOSE: Centralized Command Posting Center for the San Enrique ROTC Unit.
+           Allows administrators and personnel to create Facebook-style social posts
+           with titles, captions, and multi-image collages (+N more preview).
+           Automatically routes content to the appropriate section:
+             - "gallery"       -> appears in gallery.html and public.gallery_images
+             - "events"        -> appears in events.html and public.events
+             - "announcements" -> appears in index.html announcements and public.announcements
+             - "requirements"  -> appears in requirements advisories and announcements
+  ACCESS: admin, personnel
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Posting Center — ROTCIMS Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+
+  <style>
+    /* ── Composer Layout ── */
+    .composer-card {
+      background: #ffffff;
+      border-radius: 18px;
+      border: 1px solid #dce4de;
+      box-shadow: 0 4px 25px rgba(0,0,0,0.06);
+      margin-bottom: 2.5rem;
+      overflow: hidden;
+      transition: box-shadow .2s;
+    }
+    .composer-card:focus-within {
+      box-shadow: 0 8px 30px rgba(0,0,0,0.09);
+    }
+    .composer-header-strip {
+      padding: 1.1rem 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #edf1ee;
+      background: #ffffff;
+    }
+    .composer-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px solid var(--brass);
+      object-fit: cover;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .composer-identity {
+      flex: 1;
+    }
+    .composer-identity .unit-title {
+      font-weight: 700;
+      color: var(--ink);
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .composer-identity .post-scope {
+      font-size: 0.78rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-top: 2px;
+    }
+
+    /* ── Segmented Category Tabs (Clean Interactive Pill Bar) ── */
+    .category-tabs-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      background: #f8faf8;
+      border-bottom: 1px solid #e7ede8;
+    }
+    .cat-tab-btn {
+      background: #ffffff;
+      border: 1.5px solid #e2e8e3;
+      padding: 0.65rem 0.5rem;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.84rem;
+      color: #475569;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      transition: all .2s ease;
+      user-select: none;
+    }
+    .cat-tab-btn:hover {
+      background: #f0f5f1;
+      color: var(--primary);
+      border-color: #cbdad0;
+    }
+    .cat-tab-btn.active {
+      background: linear-gradient(135deg, #1b3826 0%, #11281a 100%);
+      color: #ffffff;
+      border-color: var(--brass);
+      box-shadow: 0 3px 12px rgba(27,56,38,0.25);
+    }
+
+    /* ── Contextual Helper Settings Strip ── */
+    .context-helper-bar {
+      padding: 0.75rem 1.4rem;
+      background: #f0f7f3;
+      border-bottom: 1px solid #e1ece5;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .context-helper-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      white-space: nowrap;
+    }
+    .context-input {
+      flex: 1;
+      min-width: 200px;
+      padding: 0.45rem 0.85rem;
+      border: 1px solid #c8d8ce;
+      border-radius: 8px;
+      font-size: 0.86rem;
+      background: #fff;
+      color: var(--ink);
+      outline: none;
+    }
+    .context-input:focus {
+      border-color: var(--brass);
+      box-shadow: 0 0 0 3px rgba(184,142,44,0.15);
+    }
+    .context-hint {
+      font-size: 0.74rem;
+      color: #64748b;
+      width: 100%;
+      margin-left: 2px;
+    }
+
+    /* ── Event Schedule Card ── */
+    .event-schedule-card {
+      background: #f8faf9;
+      border-bottom: 1px solid #e5ede7;
+      padding: 1rem 1.4rem;
+    }
+    .event-card-header {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .event-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    /* Drill Hours field spans the full width so both time inputs are visible */
+    .event-grid .drill-hours-field {
+      grid-column: 1 / -1;
+    }
+    /* On narrow screens, stack all fields vertically */
+    @media (max-width: 540px) {
+      .event-grid { grid-template-columns: 1fr; }
+    }
+    .compact-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+
+    /* ── Headline & Textarea (Comfortable Writing Area) ── */
+    .composer-headline-wrap {
+      border-bottom: 1px dashed #e2e8e3;
+    }
+    .composer-title-input {
+      width: 100%;
+      padding: 1rem 1.4rem 0.85rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #0f172a;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-family: inherit;
+    }
+    .composer-title-input::placeholder {
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .composer-body-wrap {
+      padding: 0;
+    }
+    .composer-body-textarea {
+      width: 100%;
+      padding: 1rem 1.4rem;
+      font-size: 0.96rem;
+      line-height: 1.7;
+      color: #334155;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 120px;
+    }
+    .composer-body-textarea::placeholder {
+      color: #94a3b8;
+    }
+
+    /* ── Attachment Toolbar ("Add to your dispatch") ── */
+    .composer-attachment-bar {
+      margin: 0.5rem 1.4rem 1rem;
+      padding: 0.65rem 1rem;
+      background: #ffffff;
+      border: 1px solid #e2e8e3;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    }
+    .attachment-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #475569;
+    }
+    .attachment-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .attach-btn {
+      background: #f8faf8;
+      border: 1px solid #e2e8e3;
+      padding: 0.4rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all .15s;
+    }
+    .attach-btn:hover {
+      background: #eef5f0;
+      border-color: #ccdcd0;
+      transform: translateY(-1px);
+    }
+    .attach-count-badge {
+      background: var(--brass);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* ── Interactive Emoji Drawer ── */
+    .emoji-drawer {
+      margin: 0 1.4rem 1rem;
+      padding: 0.75rem 1rem;
+      background: #fbfdfb;
+      border: 1px solid #e1eae3;
+      border-radius: 10px;
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .emoji-chip-modern {
+      background: #fff;
+      border: 1px solid #d8e3da;
+      border-radius: 8px;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.84rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #334155;
+      font-weight: 500;
+      transition: all .15s;
+      user-select: none;
+    }
+    .emoji-chip-modern:hover {
+      background: #eef5f0;
+      border-color: var(--brass);
+      transform: scale(1.05);
+    }
+
+    /* ── Media Dropzone (Comfortable, Modern) ── */
+    .media-upload-container {
+      margin: 0 1.4rem 1rem;
+    }
+    .upload-zone-modern {
+      border: 2px dashed #ccd9cf;
+      border-radius: 14px;
+      background: #fbfdfb;
+      padding: 1.4rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .upload-zone-modern:hover, .upload-zone-modern.dragover {
+      border-color: var(--brass);
+      background: #f4f8f5;
+    }
+    .upload-icon-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(184,142,44,0.12);
+      color: var(--brass);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 0.6rem;
+      font-size: 1.35rem;
+    }
+
+    /* ── Thumbnail Strip with Count Bar ── */
+    .photos-selected-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+      color: #475569;
+    }
+    .upload-thumbnails-strip {
+      display: flex;
+      gap: 0.65rem;
+      overflow-x: auto;
+      padding: 0.5rem 0.2rem;
+    }
+    .thumb-item {
+      position: relative;
+      flex-shrink: 0;
+      width: 82px;
+      height: 82px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #e1eae3;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      background: #000;
+    }
+    .thumb-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .thumb-remove {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .thumb-remove:hover {
+      background: #dc2626;
+    }
+
+    /* ── Live Collage Preview Box ── */
+    .live-preview-box {
+      margin: 0 1.4rem 1.25rem;
+      border: 1.5px solid #dce5df;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    }
+    .live-preview-header {
+      background: #f1f5f2;
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ── Bottom Submit Strip ── */
+    .composer-footer-strip {
+      padding: 1rem 1.4rem;
+      background: #f8faf8;
+      border-top: 1px solid #edf1ee;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .publish-toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+    }
+    .btn-publish-submit {
+      background: linear-gradient(135deg, #1b3826 0%, #264e35 100%);
+      color: #ffffff;
+      border: 1px solid var(--brass);
+      padding: 0.75rem 1.85rem;
+      border-radius: 30px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 15px rgba(27,56,38,0.25);
+      transition: all .2s;
+    }
+    .btn-publish-submit:hover {
+      background: linear-gradient(135deg, #152d1e 0%, #1f402c 100%);
+      box-shadow: 0 6px 20px rgba(27,56,38,0.35);
+      transform: translateY(-1px);
+    }
+
+    /* ── Social Media Card (Matching User Screenshot) ── */
+    .social-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .social-post-card {
+      background: #fff;
+      border-radius: 14px;
+      border: 1px solid var(--mist);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+    .social-post-header {
+      padding: 1.25rem 1.5rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .social-post-author {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .social-post-author img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--brass);
+      object-fit: cover;
+    }
+    .social-post-author .author-name {
+      font-weight: 700;
+      color: var(--ink);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .social-post-author .post-meta-sub {
+      font-size: 0.76rem;
+      color: var(--slate);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 1px;
+    }
+    .social-post-content {
+      padding: 0 1.5rem 1rem;
+    }
+    .social-post-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+      margin-bottom: 0.6rem;
+      text-transform: uppercase;
+    }
+    .social-post-body {
+      font-size: 0.9rem;
+      line-height: 1.65;
+      color: #334155;
+      white-space: pre-line;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Multi-Image Collage Grid ── */
+    .collage-grid {
+      display: grid;
+      gap: 3px;
+      background: #111;
+      overflow: hidden;
+      max-height: 520px;
+      cursor: pointer;
+    }
+    /* 1 Image: Full */
+    .collage-grid.count-1 {
+      grid-template-columns: 1fr;
+      max-height: 480px;
+    }
+    .collage-grid.count-1 img {
+      width: 100%;
+      height: 100%;
+      max-height: 480px;
+      object-fit: cover;
+    }
+    /* 2 Images: 50 / 50 */
+    .collage-grid.count-2 {
+      grid-template-columns: 1fr 1fr;
+      height: 380px;
+    }
+    .collage-grid.count-2 img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* 3 Images: 1 Main, 2 Side */
+    .collage-grid.count-3 {
+      grid-template-columns: 2fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      height: 420px;
+    }
+    .collage-grid.count-3 img:nth-child(1) {
+      grid-row: span 2;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .collage-grid.count-3 img:nth-child(2),
+    .collage-grid.count-3 img:nth-child(3) {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* 4+ Images: 2x2 with +N more on 4th */
+    .collage-grid.count-4-plus {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 240px 240px;
+      height: 480px;
+    }
+    .collage-grid.count-4-plus .collage-item {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+    }
+    .collage-grid.count-4-plus .collage-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .collage-more-scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.62);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: 'Oswald', sans-serif;
+      font-size: 2.25rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      user-select: none;
+      transition: background .2s;
+    }
+    .collage-more-scrim:hover {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    /* ── Post Footer Actions ── */
+    .social-post-footer {
+      padding: 0.85rem 1.5rem;
+      background: #fdfdfd;
+      border-top: 1px solid var(--mist);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .post-category-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+    }
+    .tag-gallery { background: #e0f2fe; color: #0284c7; }
+    .tag-events { background: #fef3c7; color: #b45309; }
+    .tag-announcements { background: #dcfce7; color: #15803d; }
+    .tag-requirements { background: #f3e8ff; color: #7e22ce; }
+
+    /* ── View Switcher Buttons ── */
+    .view-toggle-group {
+      display: inline-flex;
+      background: #edf2ee;
+      padding: 3px;
+      border-radius: 8px;
+      gap: 3px;
+    }
+    .view-toggle-btn {
+      border: none;
+      background: transparent;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all .2s;
+    }
+    .view-toggle-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    /* ── Compact Feed Table View ── */
+    .compact-feed-table-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid var(--mist);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+    .compact-feed-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .compact-feed-table th {
+      background: #f8faf9;
+      padding: 0.85rem 1rem;
+      text-align: left;
+      font-weight: 700;
+      color: var(--slate);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--mist);
+    }
+    .compact-feed-table td {
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid #f1f5f2;
+      vertical-align: middle;
+    }
+    .compact-feed-table tr:last-child td {
+      border-bottom: none;
+    }
+    .compact-feed-table tr:hover {
+      background: #fafcfa;
+    }
+    .compact-post-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      object-fit: cover;
+      border: 1px solid #e2e8f0;
+      background: #f1f5f9;
+      display: block;
+      cursor: pointer;
+    }
+    .compact-thumb-placeholder {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+    .compact-post-title {
+      font-weight: 700;
+      color: var(--ink);
+      font-size: 0.92rem;
+      margin-bottom: 0.2rem;
+      line-height: 1.3;
+    }
+    .compact-post-snippet {
+      font-size: 0.78rem;
+      color: #64748b;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+
+    /* ── Lightbox Slider ── */
+    #lightbox-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+    }
+    #lightbox-modal.active { display: flex; }
+    #lightbox-viewer-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      user-select: none;
+    }
+    .lightbox-nav-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .lightbox-nav-btn:hover { background: rgba(255,255,255,0.4); }
+    #lightbox-prev { left: 1.5rem; }
+    #lightbox-next { right: 1.5rem; }
+    #lightbox-close {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    #lightbox-counter {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 0.4rem 1.2rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+<div class="portal-layout">
+
+  <!-- ====== SIDEBAR ====== -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+        <div class="brand-text">ROTCIMS <span>Command Staff</span></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-group-title">Overview</div>
+      <ul class="sidebar-menu">
+        <li><a href="admin-dashboard.html"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+      </ul>
+
+      <div class="nav-group-title">Drill &amp; Attendance</div>
+      <ul class="sidebar-menu">
+        <li><a href="admin-qr-scanner.html"><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+        <li><a href="admin-attendance.html"><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+        <li><a href="admin-reports.html"><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+      </ul>
+
+      <div class="nav-group-title">Personnel &amp; Cadets</div>
+      <ul class="sidebar-menu">
+        <li><a href="admin-cadets.html"><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+        <li><a href="admin-applications.html"><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+        <li><a href="admin-personnel.html"><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+      </ul>
+
+      <div class="nav-group-title">Content &amp; Documents</div>
+      <ul class="sidebar-menu">
+        <li><a href="admin-posting.html" class="active"><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+        <li><a href="admin-documents.html"><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+      </ul>
+
+      <div class="nav-group-title">System &amp; Governance</div>
+      <ul class="sidebar-menu">
+        <li><a href="admin-accounts.html"><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+        <li><a href="admin-settings.html"><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+      </ul>
+
+      <div class="nav-group-title">Public Front</div>
+      <ul class="sidebar-menu">
+        <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+      </ul>
+    </nav>
+    <div class="sidebar-footer">
+      <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+      <button onclick="Auth.logout()" class="btn-logout"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</button>
+    </div>
+  </aside>
+
+  <!-- ====== MAIN CONTENT AREA ====== -->
+  <main class="main-content">
+
+    <!-- Top Navigation Bar -->
+    <header class="top-bar">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+        <div class="page-title">
+          <h1>Command Posting Center</h1>
+          <p>Create social feed bulletins, photo collages, and automatically publish across website sections</p>
+        </div>
+      </div>
+      <div class="user-badge">
+        <div class="avatar" id="user-avatar">AD</div>
+        <div class="user-info">
+          <div class="name" id="user-name">Loading...</div>
+          <div class="role-tag" id="user-role">Administrator</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-body" style="max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem;">
+
+      <!-- ====== POST COMPOSER CARD ====== -->
+      <div class="composer-card">
+        
+        <!-- Header Strip: Unit branding & public scope -->
+        <div class="composer-header-strip">
+          <div class="composer-identity-group">
+            <img src="assets/logo.png" alt="ROTC Logo" class="composer-avatar" onerror="this.src='assets/icon.png'">
+            <div class="composer-identity">
+              <div class="unit-title">
+                San Enrique ROTC Unit
+                <i class="fa-solid fa-circle-check" style="color: #1877f2; font-size: 0.92rem;" title="Official Verified Unit"></i>
+              </div>
+              <div class="unit-sub-meta">
+                <span id="preview-category-label"><i class="fa-solid fa-images" style="color:#0284c7;"></i> Photo Gallery</span>
+                <span>•</span>
+                <span style="color: #15803d; font-weight: 600;"><i class="fa-solid fa-earth-americas"></i> Public Dispatch</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form id="posting-form" onsubmit="handleCreatePost(event)">
+
+          <!-- Hidden select to keep 100% backward compatibility with existing scripts -->
+          <select id="post-category" style="display: none;" onchange="onCategoryChanged(this.value)">
+            <option value="gallery" selected>gallery</option>
+            <option value="events">events</option>
+            <option value="announcements">announcements</option>
+            <option value="requirements">requirements</option>
+          </select>
+
+          <!-- Interactive Category Selector Tab Bar (Clean, Comfortable, 1-Click) -->
+          <div class="category-tabs-bar">
+            <button type="button" class="cat-tab-btn active" data-cat="gallery" onclick="selectCategory('gallery')">
+              <span class="cat-icon">🖼️</span>
+              <span class="cat-text">Photo Gallery</span>
+            </button>
+            <button type="button" class="cat-tab-btn" data-cat="announcements" onclick="selectCategory('announcements')">
+              <span class="cat-icon">📢</span>
+              <span class="cat-text">Announcement</span>
+            </button>
+            <button type="button" class="cat-tab-btn" data-cat="events" onclick="selectCategory('events')">
+              <span class="cat-icon">📅</span>
+              <span class="cat-text">Event / Drill</span>
+            </button>
+            <button type="button" class="cat-tab-btn" data-cat="requirements" onclick="selectCategory('requirements')">
+              <span class="cat-icon">📋</span>
+              <span class="cat-text">Requirements</span>
+            </button>
+          </div>
+
+          <!-- Dynamic Context Field: Album Name (When Gallery is active) -->
+          <div id="dynamic-field-album" class="context-helper-bar">
+            <div class="context-helper-label"><i class="fa-solid fa-folder-open" style="color:var(--brass);"></i> Album / Activity Name:</div>
+            <input type="text" id="post-album" class="context-input" placeholder="e.g. 1st Instruction &amp; Tactical Orientation 2026">
+            <span class="context-hint"><i class="fa-solid fa-circle-info"></i> Photos will automatically be grouped under this album filter tab in the public Gallery</span>
+          </div>
+
+          <!-- Dynamic Context Card: Event Schedule (When Events is active) -->
+          <div id="dynamic-events-row" class="event-schedule-card" style="display: none;">
+            <div class="event-card-header"><i class="fa-solid fa-calendar-check" style="color:var(--brass);"></i> Event &amp; Drill Schedule Details</div>
+            <div class="event-grid">
+
+              <!-- Row 1: Date & Location side-by-side -->
+              <div>
+                <label class="compact-label"><i class="fa-regular fa-calendar"></i> Event / Drill Date *</label>
+                <input type="date" id="post-event-date" class="context-input">
+              </div>
+              <div>
+                <label class="compact-label"><i class="fa-solid fa-location-dot"></i> Drill Location</label>
+                <input type="text" id="post-event-location" class="context-input" placeholder="San Enrique Grandstand Parade Grounds">
+              </div>
+
+              <!-- Row 2: Drill Hours full-width so both start & end time are visible -->
+              <div class="drill-hours-field">
+                <label class="compact-label"><i class="fa-regular fa-clock"></i> Drill Hours (Start → End)</label>
+                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                  <input type="time" id="post-event-start" class="context-input" value="07:00" style="flex: 1; min-width: 120px;">
+                  <span style="color: var(--slate); font-size: 0.88rem; font-weight: 600; padding: 0 0.25rem;">→ to →</span>
+                  <input type="time" id="post-event-end" class="context-input" value="12:00" style="flex: 1; min-width: 120px;">
+                </div>
+              </div>
+
+              <!-- Row 3: Uniform Order full-width -->
+              <div class="drill-hours-field">
+                <label class="compact-label"><i class="fa-solid fa-shirt"></i> Uniform Order</label>
+                <input type="text" id="post-event-uniform" class="context-input" placeholder="Type B Field Uniform (Battle Dress Uniform)">
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Post Headline / Title (Clean & Natural) -->
+          <div class="composer-headline-wrap">
+            <input type="text" id="post-title" class="composer-title-input" required
+                   placeholder="Post Headline or Subject (e.g. A Milestone Filled with Discipline &amp; Honor)...">
+          </div>
+
+          <!-- Caption & Body (Spacious & Comfortable) -->
+          <div class="composer-body-wrap">
+            <textarea id="post-caption" class="composer-body-textarea" rows="4" required
+                      placeholder="Write your unit dispatch, instructions, or motivational message to cadets and public..."></textarea>
+          </div>
+
+          <!-- "Add to your dispatch" Modern Attachment Toolbar -->
+          <div class="composer-attachment-bar">
+            <div class="attachment-label">Add to your dispatch:</div>
+            <div class="attachment-actions">
+              <button type="button" class="attach-btn" onclick="triggerPhotoUpload()" title="Add photos">
+                <i class="fa-solid fa-images" style="color: #10b981; font-size: 1rem;"></i>
+                <span>Photos</span>
+                <span id="badge-photo-count" class="attach-count-badge" style="display: none;">0</span>
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleEmojiDrawer()" title="Insert emojis">
+                <i class="fa-regular fa-face-smile" style="color: #f59e0b; font-size: 1rem;"></i>
+                <span>Emoji</span>
+              </button>
+              <button type="button" class="attach-btn" onclick="toggleUrlDrawer()" title="Add image link">
+                <i class="fa-solid fa-link" style="color: #3b82f6; font-size: 1rem;"></i>
+                <span>Web Link</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Collapsible Emoji Palette Drawer -->
+          <div id="emoji-drawer" class="emoji-drawer" style="display: none;">
+            <span style="font-size: 0.76rem; font-weight: 700; color: #64748b; margin-right: 0.2rem;">Quick Emojis:</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('🫡')">🫡 Salute</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('🇵🇭')">🇵🇭 PH Flag</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('🎖️')">🎖️ Medal</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('📌')">📌 Pin</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('📅')">📅 Date</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('📋')">📋 Clipboard</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('⚔️')">⚔️ Swords</span>
+            <span class="emoji-chip-modern" onclick="insertEmoji('🛡️')">🛡️ Shield</span>
+          </div>
+
+          <!-- Collapsible URL Link Drawer -->
+          <div id="url-drawer" style="display: none; margin: 0 1.4rem 1rem;">
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="url" id="single-url-input" class="context-input" placeholder="Paste image web link (https://...) and press Add Link">
+              <button type="button" class="btn btn-outline" onclick="addImageUrl()" style="white-space: nowrap; padding: 0.45rem 1rem;">
+                <i class="fa-solid fa-plus"></i> Add Link
+              </button>
+            </div>
+          </div>
+
+          <!-- Multi-Image Dropzone & Thumbnails Area -->
+          <div class="media-upload-container">
+            <!-- Hidden file input for multi-select -->
+            <input type="file" id="multi-file-input" multiple accept="image/*" style="display: none;" onchange="handleMultipleFiles(event)">
+
+            <!-- Dropzone -->
+            <div class="upload-zone-modern" id="upload-dropzone" onclick="triggerPhotoUpload()">
+              <div class="upload-icon-circle">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+              </div>
+              <div style="font-weight: 700; color: var(--ink); font-size: 0.92rem;">
+                Click to browse photos or Drag &amp; Drop here
+              </div>
+              <div style="font-size: 0.78rem; color: #64748b; margin-top: 0.25rem;">
+                Select 1, 4, or multiple photos • System formats them into an automatic social collage
+              </div>
+            </div>
+
+            <!-- Photos Selected Summary & Thumbnails Strip -->
+            <div id="thumbnails-wrapper" style="display: none; margin-top: 0.85rem;">
+              <div class="photos-selected-bar">
+                <span id="selected-photos-count" style="font-weight: 700; color: var(--primary);">0 photos selected</span>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button type="button" onclick="triggerPhotoUpload()" class="btn btn-sm btn-outline" style="font-size: 0.74rem; padding: 0.25rem 0.65rem;">
+                    <i class="fa-solid fa-plus"></i> Add More
+                  </button>
+                  <button type="button" onclick="clearAllImages()" class="btn btn-sm btn-danger" style="font-size: 0.74rem; padding: 0.25rem 0.65rem;">
+                    <i class="fa-solid fa-trash-can"></i> Clear All
+                  </button>
+                </div>
+              </div>
+              <div class="upload-thumbnails-strip" id="thumbnails-strip"></div>
+            </div>
+          </div>
+
+          <!-- Live Social Collage Preview -->
+          <div id="live-collage-preview-wrapper" class="live-preview-box" style="display: none;">
+            <div class="live-preview-header">
+              <span><i class="fa-solid fa-eye" style="color: var(--brass);"></i> LIVE SOCIAL COLLAGE PREVIEW</span>
+              <span id="preview-grid-mode" style="color: #64748b;">Collage Ready</span>
+            </div>
+            <div id="live-collage-grid" class="collage-grid"></div>
+          </div>
+
+          <!-- Bottom Action Buttons Strip -->
+          <div class="composer-footer-strip">
+            <label class="publish-toggle-label">
+              <input type="checkbox" id="post-is-published" checked style="width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer;">
+              <span>Publish immediately to live public feed</span>
+            </label>
+            <button type="submit" id="btn-submit-post" class="btn-publish-submit">
+              <i class="fa-solid fa-paper-plane"></i> Publish Command Post
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      <!-- ====== PUBLISHED COMMAND FEED ====== -->
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+        <div>
+          <h2 style="font-family: 'Oswald', sans-serif; font-size: 1.5rem; color: var(--ink); text-transform: uppercase;">
+            <i class="fa-solid fa-newspaper" style="color: var(--brass); margin-right: 0.4rem;"></i> Published Command Feed
+          </h2>
+          <p style="font-size: 0.82rem; color: var(--slate);">Live timeline of unit announcements, gallery milestones, and drill postings</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <div class="view-toggle-group">
+            <button type="button" class="view-toggle-btn active" id="view-compact-btn" onclick="setFeedView('compact')">
+              <i class="fa-solid fa-list"></i> Compact
+            </button>
+            <button type="button" class="view-toggle-btn" id="view-full-btn" onclick="setFeedView('full')">
+              <i class="fa-solid fa-table-cells-large"></i> Full Cards
+            </button>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadPostsFeed()">
+            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="social-feed" id="posts-feed-container">
+        <div style="text-align: center; padding: 3rem; color: var(--slate);">
+          <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem;"></i> Loading unit postings…
+        </div>
+      </div>
+
+    </div><!-- end .content-body -->
+  </main>
+</div>
+
+<!-- ====== EDIT POST MODAL ====== -->
+<div class="modal-overlay" id="edit-post-modal" style="z-index: 10000;">
+  <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-pen-to-square" style="color: var(--brass);"></i> Edit Command Post</h3>
+      <button class="modal-close" onclick="closeEditPostModal()">&times;</button>
+    </div>
+    <form id="edit-post-form" onsubmit="handleUpdatePost(event)">
+      <div class="modal-body" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+        <input type="hidden" id="edit-post-id">
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--slate); margin-bottom: 0.3rem;">Category</label>
+          <select id="edit-post-category" class="context-input" style="width: 100%;">
+            <option value="gallery">Photo Gallery</option>
+            <option value="announcements">Announcement</option>
+            <option value="events">Event / Drill</option>
+            <option value="requirements">Requirements</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--slate); margin-bottom: 0.3rem;">Headline / Title *</label>
+          <input type="text" id="edit-post-title" class="context-input" style="width: 100%; font-weight: 600;" required>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--slate); margin-bottom: 0.3rem;">Caption / Content *</label>
+          <textarea id="edit-post-caption" class="context-input" style="width: 100%; min-height: 120px; resize: vertical; line-height: 1.5;" required></textarea>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.78rem; font-weight: 700; color: var(--slate); margin-bottom: 0.3rem;">Album / Subtitle</label>
+          <input type="text" id="edit-post-album" class="context-input" style="width: 100%;">
+        </div>
+
+        <div>
+          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; font-weight: 600;">
+            <input type="checkbox" id="edit-post-is-published" style="width: 16px; height: 16px; accent-color: var(--primary);">
+            <span>Published on live feeds</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 1rem 1.25rem; display: flex; justify-content: flex-end; gap: 0.5rem; background: #f9fafb; border-top: 1px solid #e5e7eb;">
+        <button type="button" class="btn btn-outline" onclick="closeEditPostModal()">Cancel</button>
+        <button type="submit" id="btn-save-edit-post" class="btn btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Save Changes
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ====== FULLSCREEN LIGHTBOX MODAL ====== -->
+<div id="lightbox-modal">
+  <button id="lightbox-close" onclick="closeLightbox()">✕</button>
+  <button class="lightbox-nav-btn" id="lightbox-prev" onclick="prevLightboxImage()">❮</button>
+  <img id="lightbox-viewer-img" src="" alt="Post Photo">
+  <button class="lightbox-nav-btn" id="lightbox-next" onclick="nextLightboxImage()">❯</button>
+  <div id="lightbox-counter">Photo 1 of 1</div>
+</div>
+
+<script>
+  let currentOfficer = null;
+  let selectedImages = [];     // Array of Base64 preview strings or public URLs (for display/thumbnails)
+  let selectedFiles  = [];     // Array of raw File objects (for Supabase Storage upload)
+  let allFeedPosts   = [];
+  let currentLightboxImages = [];
+  let currentLightboxIndex  = 0;
+
+  // ── Authentication & Init ────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    currentOfficer = await Auth.requireAuth(['admin', 'personnel']);
+    if (!currentOfficer) return;
+
+    // Populate topbar user identity
+    const name = [currentOfficer.first_name, currentOfficer.last_name].filter(Boolean).join(' ') || currentOfficer.email;
+    const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().substring(0, 2);
+    document.getElementById('user-name').textContent = name;
+    document.getElementById('user-role').textContent = (currentOfficer.role || 'Officer').toUpperCase();
+    document.getElementById('user-avatar').textContent = initials;
+    document.getElementById('sidebar-role').textContent = currentOfficer.role || 'Command';
+
+    // Drag and Drop listeners
+    setupDragAndDrop();
+
+    // Load initial feed
+    await loadPostsFeed();
+  });
+
+  // ── 1-Click Interactive Category Selector ──────────────────────────────
+  function selectCategory(cat) {
+    document.querySelectorAll('.cat-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-cat') === cat);
+    });
+    const sel = document.getElementById('post-category');
+    if (sel) sel.value = cat;
+    onCategoryChanged(cat);
+  }
+
+  // ── Category Switcher & Dynamic Field Management ────────────────────────
+  function onCategoryChanged(cat) {
+    const albumField = document.getElementById('dynamic-field-album');
+    const dateField  = document.getElementById('dynamic-field-date');
+    const eventsRow  = document.getElementById('dynamic-events-row');
+    const label      = document.getElementById('preview-category-label');
+    const titleInput = document.getElementById('post-title');
+    const captionEl  = document.getElementById('post-caption');
+    const eventDate  = document.getElementById('post-event-date');
+
+    if (cat === 'events') {
+      if (albumField) albumField.style.display = 'none';
+      if (dateField)  dateField.style.display  = 'block';
+      if (eventsRow)  eventsRow.style.display  = 'block';
+      if (label) label.innerHTML = '<i class="fa-solid fa-calendar-check" style="color:#b45309;"></i> 📅 Upcoming Event &amp; Drill Schedule';
+      if (eventDate) eventDate.required = true;
+      if (titleInput) titleInput.placeholder = 'Event Title (e.g. Regular Company Drill Assembly & Uniform Inspection)';
+      if (captionEl) captionEl.placeholder = 'Enter drill agenda, assembly instructions, or briefing guidelines for cadets...';
+    } else if (cat === 'gallery') {
+      if (albumField) albumField.style.display = 'flex';
+      if (dateField)  dateField.style.display  = 'none';
+      if (eventsRow)  eventsRow.style.display  = 'none';
+      if (label) label.innerHTML = '<i class="fa-solid fa-images" style="color:#0284c7;"></i> 🖼️ Photo Gallery &amp; Activity Documentation';
+      if (eventDate) eventDate.required = false;
+      if (titleInput) titleInput.placeholder = 'Headline or Title of this post (e.g. 1st Tactical Formation Drill & Orientation)...';
+      if (captionEl) captionEl.placeholder = 'Describe this photo activity, platoon accomplishments, or ceremony highlights...';
+    } else if (cat === 'requirements') {
+      if (albumField) albumField.style.display = 'none';
+      if (dateField)  dateField.style.display  = 'none';
+      if (eventsRow)  eventsRow.style.display  = 'none';
+      if (label) label.innerHTML = '<i class="fa-solid fa-clipboard-list" style="color:#7e22ce;"></i> 📋 Enlistment &amp; Requirements Advisory';
+      if (eventDate) eventDate.required = false;
+      if (titleInput) titleInput.placeholder = 'Title (e.g. Mandatory Enlistment Documentary Checklist)';
+      if (captionEl) captionEl.placeholder = 'List documentary requirements, submission deadlines, and physical exam instructions...';
+    } else {
+      if (albumField) albumField.style.display = 'none';
+      if (dateField)  dateField.style.display  = 'none';
+      if (eventsRow)  eventsRow.style.display  = 'none';
+      if (label) label.innerHTML = '<i class="fa-solid fa-bullhorn" style="color:#15803d;"></i> 📢 Command Announcement Directive';
+      if (eventDate) eventDate.required = false;
+      if (titleInput) titleInput.placeholder = 'Title (e.g. Command Directive on Enlistment Requirements)';
+      if (captionEl) captionEl.placeholder = 'State official unit announcement, commanding officer notice, or memorandum...';
+    }
+  }
+
+  // ── Attachment Helpers (Facebook-Style Toolbar Actions) ─────────────────
+  function triggerPhotoUpload() {
+    const input = document.getElementById('multi-file-input');
+    if (input) input.click();
+  }
+
+  function toggleEmojiDrawer() {
+    const drawer = document.getElementById('emoji-drawer');
+    if (drawer) {
+      drawer.style.display = (drawer.style.display === 'none' || !drawer.style.display) ? 'flex' : 'none';
+    }
+  }
+
+  function toggleUrlDrawer() {
+    const drawer = document.getElementById('url-drawer');
+    if (drawer) {
+      drawer.style.display = (drawer.style.display === 'none' || !drawer.style.display) ? 'block' : 'none';
+      if (drawer.style.display === 'block') {
+        const inp = document.getElementById('single-url-input');
+        if (inp) inp.focus();
+      }
+    }
+  }
+
+  function clearAllImages() {
+    if (selectedImages.length === 0) return;
+    if (confirm('Clear all uploaded photos from this post?')) {
+      selectedImages = [];
+      selectedFiles  = [];
+      renderThumbnailsAndPreview();
+    }
+  }
+
+  // ── Emojis helper ────────────────────────────────────────────────────────
+  function insertEmoji(emoji) {
+    const textarea = document.getElementById('post-caption');
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    textarea.value = text.substring(0, start) + emoji + text.substring(end);
+    textarea.focus();
+    textarea.selectionStart = textarea.selectionEnd = start + emoji.length;
+  }
+
+  // ── Drag & Drop Multi-Image ──────────────────────────────────────────────
+  function setupDragAndDrop() {
+    const dropzone = document.getElementById('upload-dropzone');
+    if (!dropzone) return;
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); }, false);
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); }, false);
+    });
+    dropzone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) processFiles(files);
+    }, false);
+  }
+
+  function handleMultipleFiles(e) {
+    processFiles(e.target.files);
+  }
+
+  function processFiles(files) {
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return;
+      // Store the raw File for later upload to Supabase Storage
+      selectedFiles.push(file);
+      // Generate a local preview with FileReader (for thumbnail display only)
+      const reader = new FileReader();
+      reader.onload = ev => {
+        selectedImages.push(ev.target.result);
+        renderThumbnailsAndPreview();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function addImageUrl() {
+    const input = document.getElementById('single-url-input');
+    const url = input.value.trim();
+    if (!url) return;
+    selectedImages.push(url);
+    input.value = '';
+    renderThumbnailsAndPreview();
+  }
+
+  function removeImage(index) {
+    selectedImages.splice(index, 1);
+    if (selectedFiles[index]) selectedFiles.splice(index, 1);
+    renderThumbnailsAndPreview();
+  }
+
+  // ── Render Thumbnails & Live Collage Preview ─────────────────────────────
+  function renderThumbnailsAndPreview() {
+    const countEl = document.getElementById('selected-photos-count');
+    const badgeEl = document.getElementById('badge-photo-count');
+    const wrapper = document.getElementById('thumbnails-wrapper');
+    const strip = document.getElementById('thumbnails-strip');
+    const liveWrap = document.getElementById('live-collage-preview-wrapper');
+    const liveGrid = document.getElementById('live-collage-grid');
+    const modeEl = document.getElementById('preview-grid-mode');
+
+    const total = selectedImages.length;
+
+    if (countEl) countEl.textContent = `${total} photo${total === 1 ? '' : 's'} selected`;
+    if (badgeEl) {
+      badgeEl.textContent = total;
+      badgeEl.style.display = total > 0 ? 'inline-block' : 'none';
+    }
+
+    if (total === 0) {
+      if (wrapper) wrapper.style.display = 'none';
+      if (strip) { strip.innerHTML = ''; }
+      if (liveWrap) liveWrap.style.display = 'none';
+      if (liveGrid) liveGrid.innerHTML = '';
+      return;
+    }
+
+    // Show thumbnails wrapper
+    if (wrapper) wrapper.style.display = 'block';
+    if (strip) {
+      strip.innerHTML = selectedImages.map((src, idx) => `
+        <div class="thumb-item">
+          <img src="${src}" alt="Thumb ${idx + 1}">
+          <button type="button" class="thumb-remove" onclick="removeImage(${idx})" title="Remove photo">✕</button>
+        </div>
+      `).join('');
+    }
+
+    // Collage Live Preview
+    if (liveWrap && liveGrid) {
+      liveWrap.style.display = 'block';
+      if (modeEl) {
+        modeEl.textContent = total === 1 ? '1 Photo (Single Full-width)' :
+                             total === 2 ? '2 Photos (Split Side-by-side)' :
+                             total === 3 ? '3 Photos (Hero + 2 Stacked)' :
+                             `4+ Photos (2×2 Grid with +${total - 4} overlay)`;
+      }
+      renderCollageGrid(liveGrid, selectedImages);
+    }
+  }
+
+  // ── Reusable Collage Grid Generator (Matches Screenshot) ─────────────────
+  function renderCollageGrid(container, images) {
+    container.className = 'collage-grid';
+    const total = images.length;
+
+    if (total === 1) {
+      container.classList.add('count-1');
+      container.innerHTML = `<img src="${images[0]}" alt="Photo 1" onclick="openLightboxFromPost(0, ${JSON.stringify(images).replace(/"/g, '&quot;')})">`;
+    } else if (total === 2) {
+      container.classList.add('count-2');
+      container.innerHTML = images.map((src, i) => `
+        <img src="${src}" alt="Photo ${i+1}" onclick="openLightboxFromPost(${i}, ${JSON.stringify(images).replace(/"/g, '&quot;')})">
+      `).join('');
+    } else if (total === 3) {
+      container.classList.add('count-3');
+      container.innerHTML = images.map((src, i) => `
+        <img src="${src}" alt="Photo ${i+1}" onclick="openLightboxFromPost(${i}, ${JSON.stringify(images).replace(/"/g, '&quot;')})">
+      `).join('');
+    } else {
+      // 4 or more photos: 2x2 grid, 4th image has "+N more"
+      container.classList.add('count-4-plus');
+      const moreCount = total - 4;
+      const imagesJson = JSON.stringify(images).replace(/"/g, '&quot;');
+
+      container.innerHTML = `
+        <div class="collage-item">
+          <img src="${images[0]}" alt="Photo 1" onclick="openLightboxFromPost(0, ${imagesJson})">
+        </div>
+        <div class="collage-item">
+          <img src="${images[1]}" alt="Photo 2" onclick="openLightboxFromPost(1, ${imagesJson})">
+        </div>
+        <div class="collage-item">
+          <img src="${images[2]}" alt="Photo 3" onclick="openLightboxFromPost(2, ${imagesJson})">
+        </div>
+        <div class="collage-item" onclick="openLightboxFromPost(3, ${imagesJson})">
+          <img src="${images[3]}" alt="Photo 4">
+          ${moreCount > 0 ? `<div class="collage-more-scrim">+${moreCount} more</div>` : ''}
+        </div>
+      `;
+    }
+  }
+
+  // ── Save & Publish Post with Database Routing ─────────────────────────────
+  async function handleCreatePost(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-post');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Publishing…';
+
+    const category     = document.getElementById('post-category').value;
+    const title        = document.getElementById('post-title').value.trim();
+    const caption      = document.getElementById('post-caption').value.trim();
+    const is_published = document.getElementById('post-is-published').checked;
+    const album_name   = document.getElementById('post-album').value.trim() || title;
+
+    // Optional event fields
+    const event_date   = document.getElementById('post-event-date').value || null;
+    const start_time   = document.getElementById('post-event-start').value || null;
+    const end_time     = document.getElementById('post-event-end').value || null;
+    const location     = document.getElementById('post-event-location').value.trim() || null;
+    const uniform_info = document.getElementById('post-event-uniform').value.trim() || null;
+
+    try {
+      // ── STEP 1: Upload raw image files to Supabase Storage ─────────────────
+      // We try uploading to a 'gallery' storage bucket. If it works, we get
+      // real public URLs. If the bucket doesn't exist, we fall back to base64.
+      let finalImageUrls = [];
+
+      if (selectedFiles.length > 0 && window.supabaseClient) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Uploading photos…';
+        const uploadPromises = selectedFiles.map(async (file, idx) => {
+          // Create a unique file name: timestamp + index + original name
+          const ext = file.name.split('.').pop() || 'jpg';
+          const fileName = `posts/${Date.now()}_${idx}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+          const { data: upData, error: upErr } = await window.supabaseClient
+            .storage
+            .from('gallery')           // bucket name must exist in Supabase Storage
+            .upload(fileName, file, { upsert: false, contentType: file.type });
+          if (upErr) {
+            console.warn('Storage upload error:', upErr.message);
+            // Fall back: keep base64 preview for this image
+            return selectedImages[idx] || null;
+          }
+          // Get the public URL of the uploaded file
+          const { data: urlData } = window.supabaseClient
+            .storage
+            .from('gallery')
+            .getPublicUrl(upData.path);
+          return urlData?.publicUrl || selectedImages[idx] || null;
+        });
+        const results = await Promise.all(uploadPromises);
+        finalImageUrls = results.filter(Boolean);
+      } else {
+        // No raw files (e.g., user pasted a URL via Web Link button)
+        finalImageUrls = selectedImages.filter(Boolean);
+      }
+
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving post…';
+
+      // ── STEP 2: Insert into unified posts table ─────────────────────────────
+      const postPayload = {
+        title,
+        caption,
+        category,
+        album_name,
+        images: finalImageUrls,            // Store real public URLs (not base64)
+        event_date,
+        location,
+        uniform_info,
+        is_published,
+        created_by: currentOfficer.id,
+        created_at: new Date().toISOString()
+      };
+
+      const { data: postResult, error: postErr } = await window.supabaseClient
+        .from('posts')
+        .insert(postPayload)
+        .select()
+        .single();
+
+      if (postErr) {
+        // If table doesn't exist yet, warn gracefully
+        console.warn('Posts table insert:', postErr);
+      }
+
+      // 2. Local storage cache for instant offline & local sync across tabs
+      try {
+        const localPosts = JSON.parse(localStorage.getItem('rotc_local_posts') || '[]');
+        const newEntry = {
+          id: postResult?.id || ('local-' + Date.now()),
+          ...postPayload,
+          created_at: new Date().toISOString()
+        };
+        localPosts.unshift(newEntry);
+        localStorage.setItem('rotc_local_posts', JSON.stringify(localPosts.slice(0, 50)));
+      } catch (lsErr) {
+        console.warn('localStorage cache notice:', lsErr);
+      }
+
+      // 3. Intelligent Auxiliary Routing to Respective System Tables:
+      try {
+        // (A) Gallery Routing
+        if (category === 'gallery') {
+          try {
+            const { data: albumData } = await window.supabaseClient
+              .from('gallery_albums')
+              .insert({
+                title: album_name,
+                description: caption,
+                cover_image_url: finalImageUrls[0] || null,
+                category: 'Unit Activity',
+                is_published
+              })
+              .select()
+              .single();
+
+            const albumId = albumData ? albumData.id : null;
+
+            if (finalImageUrls.length > 0) {
+              const imageRows = finalImageUrls.map((imgUrl, i) => ({
+                album_id: albumId,
+                title: `${title} (Photo ${i + 1})`,
+                description: caption,
+                image_url: imgUrl,
+                category: 'Unit Activity',
+                is_published,
+                uploaded_by: currentOfficer?.id || null
+              }));
+
+              await window.supabaseClient.from('gallery_images').insert(imageRows);
+            }
+          } catch (galErr) {
+            console.warn('Gallery auxiliary table insert notice:', galErr);
+          }
+        }
+
+        // (B) Events Routing
+        else if (category === 'events') {
+          try {
+            await window.supabaseClient.from('events').insert({
+              title,
+              description: caption,
+              event_date: event_date || new Date().toISOString().split('T')[0],
+              start_time: start_time ? start_time + ':00' : '07:00:00',
+              end_time: end_time ? end_time + ':00' : '12:00:00',
+              location: location || 'San Enrique Grandstand Parade Grounds',
+              uniform_info: uniform_info || 'Type B Field Uniform',
+              image_url: finalImageUrls[0] || null,
+              is_mandatory: true,
+              is_published,
+              created_by: currentOfficer?.id || null
+            });
+          } catch (evErr) {
+            console.warn('Events table insert notice:', evErr);
+          }
+        }
+
+        // (C) Announcements & Requirements Routing
+        else if (category === 'announcements' || category === 'requirements') {
+          try {
+            await window.supabaseClient.from('announcements').insert({
+              title,
+              content: caption,
+              category: category === 'requirements' ? 'Administrative' : 'General',
+              priority: 'important',
+              image_url: finalImageUrls[0] || null,
+              is_published,
+              created_by: currentOfficer?.id || null
+            });
+          } catch (anErr) {
+            console.warn('Announcements table insert notice:', anErr);
+          }
+        }
+      } catch (routingErr) {
+        console.warn('Auxiliary routing error:', routingErr);
+      }
+
+      // Reset form
+      document.getElementById('posting-form').reset();
+      selectedImages = [];
+      selectedFiles  = [];
+      renderThumbnailsAndPreview();
+      onCategoryChanged('gallery');
+
+      // Redirect to events.html if category is 'events', otherwise reload feed
+      if (category === 'events') {
+        if (window.showMobileToast) window.showMobileToast('Event published! Redirecting to Events page…', 'success');
+        setTimeout(() => { window.open('../events.html', '_blank'); }, 900);
+        await loadPostsFeed();
+      } else {
+        if (window.showMobileToast) window.showMobileToast(`Post published to ${category.toUpperCase()} feed!`, 'success');
+        else alert(`✅ Post published successfully to the Unit Feed and routed to ${category.toUpperCase()}!`);
+        await loadPostsFeed();
+      }
+
+    } catch (err) {
+      console.error('Posting error:', err);
+      alert('Error creating post: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Publish Command Post';
+    }
+  }
+
+  let currentFeedView = 'compact'; // 'compact' (recommended) or 'full'
+
+  function setFeedView(view) {
+    currentFeedView = view;
+    const cBtn = document.getElementById('view-compact-btn');
+    const fBtn = document.getElementById('view-full-btn');
+    if (cBtn) cBtn.classList.toggle('active', view === 'compact');
+    if (fBtn) fBtn.classList.toggle('active', view === 'full');
+    renderPostsFeed();
+  }
+
+  // ── Load & Render Social Feed ─────────────────────────────────────────────
+  async function loadPostsFeed() {
+    const feedContainer = document.getElementById('posts-feed-container');
+
+    const { data, error } = await window.supabaseClient
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      feedContainer.innerHTML = `
+        <div class="composer-card" style="text-align:center; padding:2rem; color:var(--slate);">
+          <i class="fa-solid fa-circle-exclamation" style="color:var(--warning); font-size:1.5rem; margin-bottom:0.5rem;"></i>
+          <div>Could not load feed: ${error.message}</div>
+          <div style="font-size:0.75rem; margin-top:0.4rem;">Make sure you ran the SQL setup for the <code>posts</code> table.</div>
+        </div>
+      `;
+      return;
+    }
+
+    allFeedPosts = data || [];
+    renderPostsFeed();
+  }
+
+  function renderPostsFeed() {
+    const feedContainer = document.getElementById('posts-feed-container');
+    if (!feedContainer) return;
+
+    if (allFeedPosts.length === 0) {
+      feedContainer.innerHTML = `
+        <div class="composer-card" style="text-align:center; padding:3rem; color:var(--slate);">
+          <i class="fa-solid fa-inbox" style="font-size:2rem; opacity:0.4; margin-bottom:0.75rem;"></i>
+          <div style="font-weight:600; font-size:1rem;">No postings published yet</div>
+          <div style="font-size:0.8rem; margin-top:0.25rem;">Use the composer above to publish your first bulletin, gallery album, or event drill!</div>
+        </div>
+      `;
+      return;
+    }
+
+    // ── VIEW 1: COMPACT TABLE/LIST VIEW (Recommended) ──────────────────────
+    if (currentFeedView === 'compact') {
+      feedContainer.innerHTML = `
+        <div class="compact-feed-table-card">
+          <div style="overflow-x: auto;">
+            <table class="compact-feed-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">Photo</th>
+                  <th>Headline / Subject</th>
+                  <th style="width: 130px;">Category</th>
+                  <th style="width: 120px;">Posted Date</th>
+                  <th style="width: 100px;">Status</th>
+                  <th style="width: 160px; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allFeedPosts.map(post => {
+                  const dateStr = post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric'
+                  }) : 'Recent';
+                  const tagClass = `tag-${post.category || 'gallery'}`;
+                  const imagesArr = Array.isArray(post.images) ? post.images : [];
+                  const firstImg = imagesArr[0] || null;
+
+                  return `
+                    <tr id="compact-row-${post.id}">
+                      <td>
+                        ${firstImg ? `
+                          <img src="${firstImg}" class="compact-post-thumb" alt="Thumbnail"
+                               onclick="openLightboxFromPost(0, ${JSON.stringify(imagesArr).replace(/"/g, '&quot;')})"
+                               title="Click to view image">
+                        ` : `
+                          <div class="compact-thumb-placeholder">
+                            <i class="fa-regular fa-image"></i>
+                          </div>
+                        `}
+                      </td>
+                      <td>
+                        <div class="compact-post-title">${escapeHtml(post.title)}</div>
+                        <div class="compact-post-snippet">${escapeHtml(post.caption)}</div>
+                      </td>
+                      <td>
+                        <span class="post-category-tag ${tagClass}">
+                          ${post.category}
+                        </span>
+                      </td>
+                      <td style="color: var(--slate); font-size: 0.82rem; white-space: nowrap;">
+                        <i class="fa-regular fa-clock" style="margin-right: 0.25rem;"></i>${dateStr}
+                      </td>
+                      <td>
+                        ${post.is_published 
+                          ? '<span class="badge badge-approved" style="font-size:0.68rem;">Published</span>' 
+                          : '<span class="badge badge-pending" style="font-size:0.68rem;">Draft</span>'}
+                      </td>
+                      <td style="text-align: right; white-space: nowrap;">
+                        <button onclick="openEditPostModal('${post.id}')" 
+                                class="btn btn-sm btn-outline" 
+                                style="font-size: 0.74rem; padding: 0.3rem 0.65rem;"
+                                title="Edit post">
+                          <i class="fa-solid fa-pen"></i> Edit
+                        </button>
+                        <button onclick="togglePublishPost('${post.id}', ${post.is_published})" 
+                                class="btn btn-sm ${post.is_published ? 'btn-outline' : 'btn-primary'}" 
+                                style="font-size: 0.74rem; padding: 0.3rem 0.65rem;"
+                                title="${post.is_published ? 'Unpublish post' : 'Publish post'}">
+                          ${post.is_published ? '⬇ Unpublish' : '⬆ Publish'}
+                        </button>
+                        <button onclick="deletePost('${post.id}')" 
+                                class="btn btn-danger btn-sm" 
+                                style="font-size: 0.74rem; padding: 0.3rem 0.65rem;"
+                                title="Delete post">
+                          <i class="fa-solid fa-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // ── VIEW 2: FULL SOCIAL MEDIA CARDS PREVIEW ────────────────────────────
+    feedContainer.innerHTML = allFeedPosts.map(post => {
+      const dateStr = post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
+      }) : 'Recent';
+
+      const tagClass = `tag-${post.category || 'gallery'}`;
+      const imagesArr = Array.isArray(post.images) ? post.images : [];
+
+      return `
+        <div class="social-post-card" id="post-${post.id}">
+
+          <!-- Post Header -->
+          <div class="social-post-header">
+            <div class="social-post-author">
+              <img src="assets/logo.png" alt="ROTC Logo" onerror="this.src='assets/icon.png'">
+              <div>
+                <div class="author-name">
+                  San Enrique ROTC Unit
+                  <i class="fa-solid fa-circle-check" style="color: #1877f2; font-size: 0.85rem;" title="Verified Unit"></i>
+                </div>
+                <div class="post-meta-sub">
+                  <span><i class="fa-solid fa-calendar-day"></i> ${post.album_name || dateStr}</span>
+                  <span>•</span>
+                  <span><i class="fa-solid fa-earth-americas"></i> Public</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Post Category Badge -->
+            <span class="post-category-tag ${tagClass}">
+              ${post.category}
+            </span>
+          </div>
+
+          <!-- Post Content -->
+          <div class="social-post-content">
+            <div class="social-post-title">${escapeHtml(post.title)}</div>
+            <div class="social-post-body">${escapeHtml(post.caption)}</div>
+          </div>
+
+          <!-- Images Collage Grid -->
+          ${imagesArr.length > 0 ? `
+            <div id="collage-container-${post.id}"></div>
+          ` : ''}
+
+          <!-- Post Footer -->
+          <div class="social-post-footer">
+            <div style="font-size: 0.78rem; color: var(--slate); display: flex; align-items: center; gap: 0.5rem;">
+              <span><i class="fa-regular fa-clock"></i> Posted on ${dateStr}</span>
+              ${post.is_published ? '<span class="badge badge-approved" style="font-size:0.65rem;">Published</span>' : '<span class="badge badge-pending" style="font-size:0.65rem;">Draft</span>'}
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button onclick="openEditPostModal('${post.id}')" class="btn btn-sm btn-outline" style="font-size: 0.75rem;">
+                <i class="fa-solid fa-pen"></i> Edit
+              </button>
+              <button onclick="togglePublishPost('${post.id}', ${post.is_published})" class="btn btn-sm ${post.is_published ? 'btn-outline' : 'btn-primary'}" style="font-size: 0.75rem;">
+                ${post.is_published ? '⬇ Unpublish' : '⬆ Publish'}
+              </button>
+              <button onclick="deletePost('${post.id}')" class="btn btn-danger btn-sm" style="font-size: 0.75rem;">
+                <i class="fa-solid fa-trash"></i> Delete
+              </button>
+            </div>
+          </div>
+
+        </div>
+      `;
+    }).join('');
+
+    // Attach collage renders for full view
+    allFeedPosts.forEach(post => {
+      const imagesArr = Array.isArray(post.images) ? post.images : [];
+      if (imagesArr.length > 0) {
+        const el = document.getElementById(`collage-container-${post.id}`);
+        if (el) renderCollageGrid(el, imagesArr);
+      }
+    });
+  }
+
+  // ── Lightbox Helpers ──────────────────────────────────────────────────────
+  function openLightboxFromPost(startIndex, images) {
+    currentLightboxImages = images;
+    currentLightboxIndex = startIndex;
+    showLightboxIndex(startIndex);
+    document.getElementById('lightbox-modal').classList.add('active');
+  }
+
+  function showLightboxIndex(index) {
+    if (!currentLightboxImages || currentLightboxImages.length === 0) return;
+    const imgEl = document.getElementById('lightbox-viewer-img');
+    const counterEl = document.getElementById('lightbox-counter');
+    imgEl.src = currentLightboxImages[index];
+    counterEl.textContent = `Photo ${index + 1} of ${currentLightboxImages.length}`;
+  }
+
+  function prevLightboxImage() {
+    if (currentLightboxIndex > 0) currentLightboxIndex--;
+    else currentLightboxIndex = currentLightboxImages.length - 1;
+    showLightboxIndex(currentLightboxIndex);
+  }
+
+  function nextLightboxImage() {
+    if (currentLightboxIndex < currentLightboxImages.length - 1) currentLightboxIndex++;
+    else currentLightboxIndex = 0;
+    showLightboxIndex(currentLightboxIndex);
+  }
+
+  function closeLightbox() {
+    document.getElementById('lightbox-modal').classList.remove('active');
+  }
+
+  // Close lightbox on Escape key & arrow keys navigation
+  document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('lightbox-modal');
+    if (modal && modal.classList.contains('active')) {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prevLightboxImage();
+      if (e.key === 'ArrowRight') nextLightboxImage();
+    }
+  });
+
+  // ── Post Management Actions ───────────────────────────────────────────────
+  async function togglePublishPost(postId, currentStatus) {
+    const { error } = await window.supabaseClient
+      .from('posts')
+      .update({ is_published: !currentStatus, updated_at: new Date().toISOString() })
+      .eq('id', postId);
+
+    if (error) alert('Error updating status: ' + error.message);
+    else await loadPostsFeed();
+  }
+
+  async function deletePost(postId) {
+    if (!confirm('Are you sure you want to delete this command post?')) return;
+    const { error } = await window.supabaseClient
+      .from('posts')
+      .delete()
+      .eq('id', postId);
+
+    if (error) {
+      alert('Error deleting post: ' + error.message);
+    } else {
+      try {
+        const local = JSON.parse(localStorage.getItem('rotc_local_posts') || '[]');
+        const updated = local.filter(p => p.id !== postId);
+        localStorage.setItem('rotc_local_posts', JSON.stringify(updated));
+      } catch(e) {}
+      await loadPostsFeed();
+    }
+  }
+
+  // ── Edit Post Modal Handlers ──────────────────────────────────────────────
+  function openEditPostModal(postId) {
+    const post = allFeedPosts.find(p => p.id === postId);
+    if (!post) return;
+
+    document.getElementById('edit-post-id').value = post.id;
+    document.getElementById('edit-post-title').value = post.title || '';
+    document.getElementById('edit-post-caption').value = post.caption || '';
+    document.getElementById('edit-post-category').value = post.category || 'gallery';
+    document.getElementById('edit-post-album').value = post.album_name || '';
+    document.getElementById('edit-post-is-published').checked = post.is_published !== false;
+
+    const modal = document.getElementById('edit-post-modal');
+    if (modal) modal.classList.add('active');
+  }
+
+  function closeEditPostModal() {
+    const modal = document.getElementById('edit-post-modal');
+    if (modal) modal.classList.remove('active');
+  }
+
+  async function handleUpdatePost(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-save-edit-post');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+    const postId = document.getElementById('edit-post-id').value;
+    const title = document.getElementById('edit-post-title').value.trim();
+    const caption = document.getElementById('edit-post-caption').value.trim();
+    const category = document.getElementById('edit-post-category').value;
+    const album_name = document.getElementById('edit-post-album').value.trim();
+    const is_published = document.getElementById('edit-post-is-published').checked;
+
+    try {
+      const { error } = await window.supabaseClient
+        .from('posts')
+        .update({
+          title,
+          caption,
+          category,
+          album_name,
+          is_published,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', postId);
+
+      if (error) {
+        alert('Error updating post: ' + error.message);
+      } else {
+        // Also update local storage if present
+        try {
+          const local = JSON.parse(localStorage.getItem('rotc_local_posts') || '[]');
+          const idx = local.findIndex(p => p.id === postId);
+          if (idx !== -1) {
+            local[idx] = { ...local[idx], title, caption, category, album_name, is_published };
+            localStorage.setItem('rotc_local_posts', JSON.stringify(local));
+          }
+        } catch(e) {}
+
+        closeEditPostModal();
+        await loadPostsFeed();
+      }
+    } catch(err) {
+      alert('Error updating post: ' + (err.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/[&<>"']/g, function(m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+</script>
+</body>
+</html>
+

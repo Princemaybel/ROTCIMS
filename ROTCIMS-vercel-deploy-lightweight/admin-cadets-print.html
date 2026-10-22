@@ -1,0 +1,400 @@
+<!--
+  ============================================================
+  FILE: admin-cadets-print.html
+  PURPOSE: Printable QR badge cut-sheet generator.
+           Fetches all cadet profiles and renders a grid of
+           individual badge cards. Each card includes:
+             • Unit header (SAN ENRIQUE ROTC • AFP DMST)
+             • A QR code image generated from the cadet's
+               unique token (SE-ROTC-<studentId>-<UUID prefix>)
+             • Cadet name, student ID, course/section, unit
+           Officers filter by company or enlistment status
+           before clicking "Print Badge Sheets" to send only
+           the desired subset to the printer.
+
+  PRINT BEHAVIOUR:
+    @media print hides all elements except #printable-badges-area.
+    The grid switches to exactly 3 columns (letter/A4 portrait).
+    page-break-inside: avoid keeps each badge from splitting
+    across page boundaries.
+
+  ACCESS: Restricted to 'admin', 'personnel', or
+          'platoon_leader'. Auth.requireAuth() enforces this.
+
+  SUPABASE TABLES USED:
+    READ → profiles  (id, first_name, last_name, student_id,
+                      course, section, company, platoon, status
+                      WHERE role = 'cadet')
+
+  THIRD-PARTY LIBRARY:
+    QRCode.js (cdnjs) — generates QR code <canvas> images
+    client-side from a text token string.
+
+  QR TOKEN FORMAT:
+    "SE-ROTC-<student_id>-<first 6 chars of UUID uppercase>"
+    e.g. "SE-ROTC-2024-0001-AB12CD"
+    This same format is matched by the QR scanner page.
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js, js/auth.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Print Cadet QR Badges — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QRCode.js: generates QR code images in the browser without a server.
+       Exposes the global QRCode constructor. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+
+  <!-- ====== BADGE & PRINT STYLES ====== -->
+  <style>
+    /* badge-grid: responsive grid that auto-fills with 220px-wide columns on screen */
+    .badge-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    /* print-badge: each individual badge card.
+       page-break-inside: avoid prevents a badge from splitting across print pages.
+       The dashed border acts as a cut-line guide. */
+    .print-badge {
+      border: 2px dashed #4b5563; /* dashed = visual cut guide */
+      padding: 10px;
+      border-radius: 8px;
+      background: #fff;
+      text-align: center;
+      page-break-inside: avoid; /* keeps badge intact when printing */
+      position: relative;
+    }
+
+    /* Badge header row: unit name in small caps above the QR code */
+    .badge-header {
+      font-size: 0.65rem;
+      font-weight: 800;
+      color: #1e3a29;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+    }
+
+    /* QR code centering wrapper */
+    .badge-qr-container {
+      display: flex;
+      justify-content: center;
+      margin: 6px 0;
+    }
+
+    /* Cadet name — primary identity text on the badge */
+    .badge-cadet-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.2;
+    }
+
+    /* Student ID in monospace and brass colour for easy scanning by eye */
+    .badge-cadet-id {
+      font-family: monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #b88e2c; /* brass colour matches ROTC theme */
+    }
+
+    /* Secondary cadet details: course, unit */
+    .badge-cadet-unit {
+      font-size: 0.68rem;
+      color: #4b5563;
+      margin-top: 2px;
+    }
+
+    /* ── PRINT OVERRIDES ────────────────────────────────────────────────── */
+    @media print {
+      /* Hide everything on the page... */
+      body * { visibility: hidden; }
+      /* ...then reveal ONLY the badge area and its children */
+      #printable-badges-area, #printable-badges-area * { visibility: visible; }
+      #printable-badges-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 5mm; /* narrow page margin for tighter badge density */
+      }
+      /* Lock to exactly 3 columns for Letter/A4 portrait layout */
+      .badge-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 6mm !important;
+      }
+      /* Hide the toolbar (filter controls, print button) when printing */
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION (hidden when printing via no-print class) ====== -->
+    <aside class="sidebar no-print">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html">📊 Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html">📷 Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html">📋 Attendance Records</a></li>
+          <li><a href="admin-reports.html">📈 Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html">🎖️ Cadet Directory</a></li>
+          <li><a href="admin-applications.html">📝 Applications Review</a></li>
+          <!-- class="active" highlights this page in the sidebar -->
+          <li><a href="admin-cadets-print.html" class="active">🖨️ Print QR Badges</a></li>
+          <li><a href="admin-personnel.html">🛡️ ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html">✍️ Posting Center</a></li>
+          <li><a href="admin-documents.html">📁 Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html">👥 Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html">⚙️ System Settings</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR (hidden when printing) ====== -->
+      <header class="top-bar no-print">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>Print Cadet QR Badges</h1>
+            <p>Generate printable badge sheets formatted with cut-lines for drill inspections.</p>
+          </div>
+        </div>
+
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">PR</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <div class="role-tag" id="user-role">Officer</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <div class="content-body">
+        
+        <!-- ====== CONTROLS TOOLBAR (hidden when printing) ====== -->
+        <!-- Filter the badge grid before printing so only a specific
+             company or only approved cadets appear on the sheet. -->
+        <div class="card no-print" style="padding: 1.25rem;">
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+
+              <!-- Company filter — triggers renderBadges() on change -->
+              <div>
+                <label class="form-label" for="filter-company">Filter Company</label>
+                <select id="filter-company" class="form-select" onchange="renderBadges()">
+                  <option value="all">All Companies</option>
+                  <option value="Alpha">Alpha Company</option>
+                  <option value="Bravo">Bravo Company</option>
+                  <option value="Charlie">Charlie Company</option>
+                </select>
+              </div>
+
+              <!-- Status filter: default is 'approved' so unapproved cadets
+                   don't get badges until they're officially enrolled. -->
+              <div>
+                <label class="form-label" for="filter-status">Enlistment Status</label>
+                <select id="filter-status" class="form-select" onchange="renderBadges()">
+                  <option value="approved">Approved Cadets Only</option>
+                  <option value="all">All Registered Cadets</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Print button — triggers the browser print dialog -->
+            <div>
+              <button onclick="window.print()" class="btn btn-primary" style="padding: 0.65rem 1.5rem;">
+                🖨️ Print Badge Sheets
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====== PRINTABLE BADGES AREA ====== -->
+        <!-- This outer div is the only visible content during printing
+             (the @media print rule positions it at top:0, left:0). -->
+        <div id="printable-badges-area">
+          <div class="card" style="padding: 1.5rem;">
+            <!-- Count header (hidden when printing via no-print) -->
+            <div class="card-header no-print" style="margin-bottom: 1rem;">
+              <h3>Cadet Attendance Badges (<span id="badge-count">0</span>)</h3>
+              <p style="font-size: 0.8rem; color: var(--slate);">Format: 3 columns per page (Letter / A4 portrait). Cut along dashed lines.</p>
+            </div>
+
+            <!-- #badge-grid: badge cards are rendered here by renderBadges() -->
+            <div id="badge-grid" class="badge-grid">
+              <div style="text-align: center; padding: 3rem; color: var(--slate); grid-column: 1 / -1;">
+                Generating cadet QR badges...
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== BADGE GENERATION SCRIPT ====== -->
+  <script>
+    // cadetList — cached profiles array; filtering is done client-side
+    let cadetList = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD ──────────────────────────────────────────────────
+      const officer = await Auth.requireAuth(["admin", "personnel", "platoon_leader"]);
+      if (!officer) return;
+
+      await loadCadets();
+    });
+
+    // ── loadCadets() ─────────────────────────────────────────────────────
+    // Fetches only the columns needed to generate a badge.
+    // We do NOT request sensitive fields (email, address, emergency_contact)
+    // since the printed badge only needs public-facing info.
+    async function loadCadets() {
+      const { data, error } = await window.supabaseClient
+        .from("profiles")
+        .select("id, first_name, last_name, student_id, course, section, company, platoon, status")
+        .eq("role", "cadet")               // exclude personnel accounts
+        .order("last_name", { ascending: true }); // alphabetical for printed sheets
+
+      if (error) {
+        alert("Failed to load cadets: " + error.message);
+        return;
+      }
+      cadetList = data || [];
+      renderBadges(); // generate initial badge grid (approved cadets by default)
+    }
+
+    // ── renderBadges() ────────────────────────────────────────────────────
+    // Filters cadetList by company and status, then creates a badge <div>
+    // for each cadet and generates a QR code image inside it.
+    function renderBadges() {
+      const comp = document.getElementById("filter-company").value;
+      const stat = document.getElementById("filter-status").value;
+
+      // Client-side filter — instant, no DB call needed
+      const filtered = cadetList.filter(c => {
+        const matchComp = comp === "all" || c.company === comp;
+        const matchStat = stat === "all" || c.status === stat;
+        return matchComp && matchStat;
+      });
+
+      // Update the count label in the card header
+      document.getElementById("badge-count").textContent = filtered.length;
+      const grid = document.getElementById("badge-grid");
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--slate); grid-column: 1 / -1;">No cadets found matching filters.</div>';
+        return;
+      }
+
+      // Clear any existing badges before re-rendering
+      grid.innerHTML = "";
+
+      filtered.forEach((c, idx) => {
+        // ── Build QR token ─────────────────────────────────────────────
+        // Token format: "SE-ROTC-<studentId>-<6-char UUID prefix uppercase>"
+        // The UUID prefix makes each token globally unique even if two cadets
+        // share the same student ID (e.g. after a database migration).
+        // The QR scanner page (admin-qr-scanner.html) matches this token
+        // against the qr_codes table first, then falls back to student_id.
+        const qrToken = `SE-ROTC-${c.student_id}-${c.id.substring(0, 6).toUpperCase()}`;
+
+        // Create the badge container element
+        const badgeDiv = document.createElement("div");
+        badgeDiv.className = "print-badge";
+
+        // Inject the badge HTML structure.
+        // #qr-box-{idx} is the DOM target for the QRCode constructor below.
+        badgeDiv.innerHTML = `
+          <div class="badge-header">SAN ENRIQUE ROTC • AFP DMST</div>
+          <!-- QRCode.js will inject a <canvas> (or <img>) inside this div -->
+          <div class="badge-qr-container" id="qr-box-${idx}"></div>
+          <div class="badge-cadet-name">${c.last_name}, ${c.first_name}</div>
+          <div class="badge-cadet-id">${c.student_id}</div>
+          <div class="badge-cadet-unit">${c.course} ${c.section ? '(' + c.section + ')' : ''}</div>
+          <div class="badge-cadet-unit"><strong>${c.company || 'Unassigned'}</strong> • ${c.platoon || ''}</div>
+        `;
+
+        // Append badge to the grid before generating the QR code,
+        // because QRCode.js needs the target element to exist in the DOM.
+        grid.appendChild(badgeDiv);
+
+        // ── Generate QR code inside the badge ──────────────────────────
+        // new QRCode(element, options) renders a QR image synchronously.
+        // width/height = 90px keeps the badge compact for a 3-column layout.
+        // correctLevel: M (15% error correction) — good balance of density
+        //               vs. scanning reliability at small print sizes.
+        new QRCode(document.getElementById(`qr-box-${idx}`), {
+          text: qrToken,          // the string encoded in the QR pattern
+          width: 90,
+          height: 90,
+          colorDark: "#000000",   // black modules for maximum contrast
+          colorLight: "#ffffff",  // white background
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      });
+    }
+  </script>
+</body>
+</html>

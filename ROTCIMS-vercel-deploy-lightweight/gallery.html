@@ -1,0 +1,547 @@
+<!--
+  ============================================================
+  FILE: gallery.html
+  PURPOSE: Public photo gallery showcasing ROTC unit activities including
+           formation drills, inspections, and MS 41-42 graduation ceremonies.
+           Includes filter buttons that show/hide photos by category using
+           pure JavaScript (no page reload required).
+  AUDIENCE: Prospective cadets, current cadets, parents, alumni, public.
+  SUPABASE TABLES USED:
+    - gallery_images (cntisxkugmvwsommzjom) — dynamic images loaded at runtime
+    - posts (cntisxkugmvwsommzjom) — published posts with photo arrays
+  STORAGE: All gallery images are served from Supabase Storage:
+    https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/
+  NOTE: Local assets/gallery/ folders have been deleted. All image paths
+        below use Supabase Storage public URLs.
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <!-- ====== HEAD / META SECTION ====== -->
+
+  <!-- UTF-8 character encoding — required for emoji and special characters -->
+  <meta charset="UTF-8">
+
+  <!-- Responsive viewport — prevents mobile browsers from zooming out -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Browser tab title for the gallery page -->
+  <title>Gallery — San Enrique ROTC Unit</title>
+
+  <!-- Shared site-wide styles: colors, typography, cards, buttons -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Responsive layout adjustments for smaller screens -->
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Visual enhancements: animations, glassmorphism, improved typography -->
+  <link rel="stylesheet" href="css/enhancements.css">
+  <!-- Font Awesome 6: icons used throughout the page -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase CDN and configuration -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+
+  <!-- ====== PAGE-SPECIFIC STYLES ====== -->
+
+  <!-- These styles are scoped to gallery.html only.
+       They are placed in <head> instead of a separate file because
+       they are small and only used on this page. -->
+  <style>
+    /* ── Gallery Grid ──────────────────────────────────────────────
+       CSS Grid layout for the photo tiles.
+       auto-fill + minmax(280px, 1fr) creates as many columns as fit,
+       each at least 280px wide, expanding evenly to fill the row. */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* ── Individual Photo Card ──────────────────────────────────────
+       overflow: hidden clips the image to the rounded border-radius
+       so the photo corners don't stick out of the card. */
+    .gallery-item {
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid var(--mist);
+      box-shadow: var(--shadow);
+      /* Smooth transition for the hover lift effect below */
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    /* ── Hover Lift Effect ──────────────────────────────────────────
+       translateY(-3px) moves the card up 3px to give a "lift" feeling.
+       Combined with a larger shadow, this provides tactile feedback. */
+    .gallery-item:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ── Photo Image ────────────────────────────────────────────────
+       width: 100% fills the card width regardless of screen size.
+       height: 220px forces a uniform height so all cards align.
+       object-fit: cover crops the image to fill without stretching. */
+    .gallery-item img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      display: block; /* Removes the small gap below inline images */
+    }
+
+    /* ── Caption Below Image ────────────────────────────────────────
+       Small descriptive label rendered below each photo inside the card */
+    .gallery-caption {
+      padding: 0.85rem 1rem;
+      font-size: 0.82rem;
+      color: var(--slate);
+      font-weight: 600;
+    }
+
+    .gallery-desc-text {
+      font-size: 0.78rem;
+      color: var(--slate);
+      font-weight: normal;
+      margin-top: 0.35rem;
+      line-height: 1.45;
+      white-space: pre-line;
+      position: relative;
+    }
+    .gallery-desc-text.collapsed {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .btn-gallery-more {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 0;
+      margin-top: 0.3rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-family: inherit;
+    }
+    .btn-gallery-more:hover {
+      color: var(--brass);
+      text-decoration: underline;
+    }
+
+    /* ── Filter Button Group Container ─────────────────────────────
+       flex + flex-wrap allows buttons to wrap to the next line
+       on small screens instead of overflowing horizontally. */
+    .filter-btn-group {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    /* ── Filter Button (Default State) ─────────────────────────────
+       Pill-shaped button for each photo category filter.
+       border-radius: 20px creates the rounded "pill" shape. */
+    .filter-btn {
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      border: 1px solid var(--mist);
+      background: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--slate);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    /* ── Filter Button (Active / Hovered State) ─────────────────────
+       The active class is toggled by filterGallery() in JavaScript.
+       Primary color fill signals which filter is currently applied. */
+    .filter-btn.active, .filter-btn:hover {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+  </style>
+
+</head>
+<body>
+
+  <!-- ====== HEADER / NAVIGATION ====== -->
+
+  <!-- Header Navigation -->
+  <!-- Shared sticky top navigation bar across all public pages -->
+  <header class="site-header">
+
+    <!-- Brand block: logo + system name -->
+    <div class="brand">
+      <!-- onerror shows a fallback icon if logo.png cannot be found -->
+      <img src="assets/logo.png" alt="ROTC Logo" onerror="this.src='assets/icon.png'">
+      <div class="brand-text">
+        ROTCIMS
+        <span>San Enrique ROTC Unit</span>
+      </div>
+    </div>
+
+    <!-- Mobile hamburger menu button — toggled by nav.js -->
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+
+    <nav id="site-nav">
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="requirements.html">Requirements</a></li>
+        <li><a href="benefits.html">Benefits</a></li>
+        <li><a href="events.html">Events</a></li>
+        <!-- "active" highlights Gallery as the current page -->
+        <li><a href="gallery.html" class="active">Gallery</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="downloads/san-enrique-rotc.apk">Android App</a></li>
+        <li>
+          <a href="login.html" class="nav-btn btn-join-now">
+            <i class="fa-solid fa-right-to-bracket"></i> JOIN NOW
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- ====== PAGE HERO HEADER BANNER ====== -->
+  <section class="page-header-banner">
+    <div class="page-header-content">
+      <div class="page-header-badge">
+        <i class="fa-solid fa-camera"></i> Visual Documentation
+      </div>
+      <h1 class="page-header-title">
+        Unit Activity &amp; <span class="accent">Training Gallery</span>
+      </h1>
+      <p class="page-header-subtitle">
+        Photographic records of parade formations, marksmanship instructions, obstacle courses, and graduation ceremonies.
+      </p>
+      <div class="page-breadcrumbs">
+        <a href="index.html">Home</a>
+        <span>&bull;</span>
+        <span>Photo Gallery</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== MAIN CONTENT AREA ====== -->
+  <main style="max-width: 1100px; margin: 3rem auto; padding: 0 1.5rem;">
+
+    <!-- ====== FILTER BUTTONS ====== -->
+
+    <!-- Filter Buttons -->
+    <!-- These buttons call filterGallery() when clicked.
+         Each button is associated with a data-cat category value.
+         justify-content: center keeps the button group centered. -->
+    <div class="filter-btn-group" style="justify-content: center;">
+      <!-- "All Photos" button: shows every gallery item (category = 'all') -->
+      <button class="filter-btn active" onclick="filterGallery('all', this)">All Photos</button>
+
+      <!-- Filter by "instruction" category — 1st drill assembly photos -->
+      <button class="filter-btn" onclick="filterGallery('instruction', this)">1st Instruction &amp; Assembly</button>
+
+      <!-- Filter by "graduate" category — graduation ceremony photos -->
+      <button class="filter-btn" onclick="filterGallery('graduate', this)">MS 41-42 Graduation</button>
+    </div>
+
+    <!-- ====== GALLERY GRID (Dynamic Supabase Loader) ====== -->
+    <div class="gallery-grid" id="gallery-container">
+      <div id="gallery-loading" style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: var(--slate);">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--brass); margin-bottom: 1rem; display: block;"></i>
+        <div style="font-weight: 600; font-size: 1.1rem; color: var(--ink);">Loading gallery photos from Supabase...</div>
+        <p style="font-size: 0.85rem; margin-top: 0.4rem; color: var(--slate);">Connecting to cloud media storage...</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ====== FOOTER ====== -->
+
+  <!-- Consistent site-wide footer -->
+  <footer style="background: var(--primary-dark); color: rgba(255,255,255,0.6); text-align: center; padding: 2rem 1.5rem; font-size: 0.85rem; margin-top: 4rem;">
+    San Enrique ROTC Unit • Department of Military Science &amp; Tactics
+  </footer>
+
+  <!-- ====== LIGHTBOX FOR PUBLIC GALLERY ====== -->
+  <div id="pub-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;cursor:pointer;" onclick="closePublicLightbox()">
+    <button style="position:fixed;top:1.5rem;right:1.5rem;background:rgba(255,255,255,0.2);color:#fff;border:none;font-size:1.8rem;border-radius:50%;width:44px;height:44px;cursor:pointer;" onclick="closePublicLightbox()">&times;</button>
+    <img id="pub-lightbox-img" src="" alt="Full view" style="max-width:92vw;max-height:86vh;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,0.6);" onclick="event.stopPropagation()">
+    <div id="pub-lightbox-caption" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#fff;padding:0.6rem 1.4rem;border-radius:24px;font-size:0.9rem;white-space:nowrap;pointer-events:none;"></div>
+  </div>
+
+  <!-- ====== JAVASCRIPT: GALLERY FILTER & SUPABASE LOADER ====== -->
+
+  <script>
+    // ── filterGallery(category, btn) ───────────────────────────────────
+    function filterGallery(category, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const items = document.querySelectorAll('.gallery-item');
+      items.forEach(item => {
+        const itemCat = item.getAttribute('data-cat') || '';
+        if (category === 'all' || itemCat.toLowerCase() === category.toLowerCase() || itemCat.includes(category)) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+
+    // ── Lightbox Helpers ────────────────────────────────────────────────
+    function openPublicLightbox(src, caption) {
+      const lb = document.getElementById('pub-lightbox');
+      const img = document.getElementById('pub-lightbox-img');
+      const cap = document.getElementById('pub-lightbox-caption');
+      img.src = src;
+      cap.textContent = caption || '';
+      lb.style.display = 'flex';
+    }
+    function closePublicLightbox() {
+      const lb = document.getElementById('pub-lightbox');
+      lb.style.display = 'none';
+      document.getElementById('pub-lightbox-img').src = '';
+    }
+
+    // ── See More / See Less Toggle for Gallery Cards ─────────────────────
+    function toggleGalleryCaption(textId, btnId) {
+      const el = document.getElementById(textId);
+      const btn = document.getElementById(btnId);
+      if (!el || !btn) return;
+
+      const isCollapsed = el.classList.contains('collapsed');
+      if (isCollapsed) {
+        el.classList.remove('collapsed');
+        btn.innerHTML = '<span>See less</span> <i class="fa-solid fa-chevron-up" style="font-size:0.65rem;"></i>';
+      } else {
+        el.classList.add('collapsed');
+        btn.innerHTML = '<span>See more</span> <i class="fa-solid fa-chevron-down" style="font-size:0.65rem;"></i>';
+      }
+    }
+
+    // ── Safe HTML escape helper ─────────────────────────────────────────
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // ── Load live gallery photos from Supabase ───────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      const container = document.getElementById('gallery-container');
+      const btnGroup = document.querySelector('.filter-btn-group');
+      const loadingEl = document.getElementById('gallery-loading');
+      const existingCats = new Set(['all']);
+      const renderedUrls = new Set();
+
+      let posts = [];
+      let directImages = [];
+
+      // 1. Fetch images from main Supabase (gallery_images table)
+      if (window.supabaseClient) {
+        try {
+          const { data: imgData, error: imgErr } = await window.supabaseClient
+            .from('gallery_images')
+            .select('*')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+
+          if (!imgErr && Array.isArray(imgData)) {
+            directImages = imgData;
+          } else if (imgErr) {
+            console.warn('gallery_images notice:', imgErr);
+          }
+        } catch (err) {
+          console.warn('gallery_images fetch error:', err);
+        }
+      }
+
+      // 2. Also fetch from main Supabase (posts table) for announcements with photos
+      if (window.supabaseClient) {
+        try {
+          const { data: postsData, error: postErr } = await window.supabaseClient
+            .from('posts')
+            .select('*')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+
+          if (!postErr && Array.isArray(postsData)) {
+            posts = postsData.filter(p => {
+              if (p.category === 'gallery') return true;
+              if (Array.isArray(p.images) && p.images.length > 0) return true;
+              if (typeof p.images === 'string' && p.images.trim().length > 2) return true;
+              if (p.image_url && p.image_url.trim()) return true;
+              return false;
+            });
+          }
+        } catch (err) {
+          console.warn('Main Supabase posts fetch notice:', err);
+        }
+      }
+
+      // 3. Fallback check for localStorage
+      try {
+        const local = JSON.parse(localStorage.getItem('rotc_local_posts') || '[]');
+        local.forEach(lp => {
+          if ((lp.category === 'gallery' || (Array.isArray(lp.images) && lp.images.length > 0)) && lp.is_published !== false) {
+            const exists = posts.some(p => p.id === lp.id || (p.title === lp.title && p.created_at === lp.created_at));
+            if (!exists) posts.unshift(lp);
+          }
+        });
+      } catch (err) {
+        console.warn('localStorage read notice:', err);
+      }
+
+      // Remove loading indicator
+      if (loadingEl) loadingEl.remove();
+
+      // Normalize category slug helper
+      function getCategorySlug(catName) {
+        if (!catName) return 'general';
+        const lower = catName.toLowerCase();
+        if (lower.includes('instruction')) return 'instruction';
+        if (lower.includes('graduate') || lower.includes('graduation')) return 'graduate';
+        return lower.replace(/[^a-z0-9]/g, '-').slice(0, 30);
+      }
+
+      // 4. Render direct images from gallery_images table
+      directImages.forEach(img => {
+        if (!img.image_url || renderedUrls.has(img.image_url)) return;
+        renderedUrls.add(img.image_url);
+
+        const catName = (img.category || 'General').trim();
+        const catSlug = getCategorySlug(catName);
+
+        if (!existingCats.has(catSlug) && catName) {
+          existingCats.add(catSlug);
+          const newBtn = document.createElement('button');
+          newBtn.className = 'filter-btn';
+          newBtn.textContent = catName;
+          newBtn.onclick = function() { filterGallery(catSlug, this); };
+          btnGroup.appendChild(newBtn);
+        }
+
+        const desc = (img.description || '').trim();
+        const isLongDesc = desc.length > 70 || desc.split('\n').length > 2;
+        const descId = `g-desc-img-${img.id || Math.random().toString(36).substr(2, 9)}`;
+        const btnId = `g-btn-img-${img.id || Math.random().toString(36).substr(2, 9)}`;
+
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.setAttribute('data-cat', catSlug);
+        item.innerHTML = `
+          <img src="${img.image_url}" alt="${escapeHtml(img.title || 'ROTC Photo')}" loading="lazy" style="cursor:pointer;">
+          <div class="gallery-caption">
+            <span class="badge badge-admin" style="font-size:0.65rem; margin-right:0.35rem;">${escapeHtml(catName)}</span>
+            <div style="font-weight:700; color:var(--ink); font-size:0.92rem; margin-top:0.25rem;">${escapeHtml(img.title || '')}</div>
+            ${desc ? `
+              <div class="gallery-desc-text ${isLongDesc ? 'collapsed' : ''}" id="${descId}">${escapeHtml(desc)}</div>
+              ${isLongDesc ? `
+                <button type="button" class="btn-gallery-more" id="${btnId}" onclick="toggleGalleryCaption('${descId}', '${btnId}')">
+                  <span>See more</span> <i class="fa-solid fa-chevron-down" style="font-size:0.65rem;"></i>
+                </button>
+              ` : ''}
+            ` : ''}
+          </div>
+        `;
+
+        const imageEl = item.querySelector('img');
+        imageEl.addEventListener('click', () => openPublicLightbox(img.image_url, img.title || ''));
+        container.appendChild(item);
+      });
+
+      // 5. Render photos from Posts table
+      posts.forEach(post => {
+        const albumName = (post.album_name || post.title || 'Unit Dispatch').trim();
+        const catSlug = 'album-' + albumName.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30);
+
+        if (!existingCats.has(catSlug) && albumName) {
+          existingCats.add(catSlug);
+          const newBtn = document.createElement('button');
+          newBtn.className = 'filter-btn';
+          newBtn.innerHTML = `<i class="fa-solid fa-images" style="font-size:0.75rem; margin-right:0.35rem; color:var(--brass);"></i> ${escapeHtml(albumName)}`;
+          newBtn.onclick = function() { filterGallery(catSlug, this); };
+          btnGroup.appendChild(newBtn);
+        }
+
+        let imagesArr = [];
+        if (Array.isArray(post.images)) imagesArr = post.images;
+        else if (typeof post.images === 'string') {
+          try { imagesArr = JSON.parse(post.images); } catch (e) { imagesArr = [post.images]; }
+        }
+        if (imagesArr.length === 0 && post.image_url) imagesArr = [post.image_url];
+
+        imagesArr.forEach((imgSrc, idx) => {
+          if (!imgSrc || renderedUrls.has(imgSrc)) return;
+          renderedUrls.add(imgSrc);
+
+          const photoTitle = imagesArr.length > 1 ? `${post.title} (${idx + 1} of ${imagesArr.length})` : post.title;
+          const dateStr = post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+          const caption = (post.caption || '').trim();
+          const isLongCap = caption.length > 70 || caption.split('\n').length > 2;
+          const capId = `g-cap-post-${post.id || 'p'}-${idx}`;
+          const btnCapId = `g-btn-post-${post.id || 'p'}-${idx}`;
+
+          const item = document.createElement('div');
+          item.className = 'gallery-item';
+          item.setAttribute('data-cat', catSlug);
+          item.innerHTML = `
+            <img src="${imgSrc}" alt="${escapeHtml(photoTitle)}" loading="lazy" style="cursor:pointer;">
+            <div class="gallery-caption">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem; margin-bottom:0.35rem;">
+                <span class="badge badge-admin" style="font-size:0.65rem; background:rgba(30,58,41,0.08); color:var(--primary); font-weight:700;">
+                  <i class="fa-solid fa-camera" style="margin-right:0.25rem;"></i>${escapeHtml(albumName)}
+                </span>
+                ${dateStr ? `<span style="font-size:0.7rem; color:var(--slate);">${escapeHtml(dateStr)}</span>` : ''}
+              </div>
+              <div style="font-weight:700; color:var(--ink); font-size:0.92rem; line-height:1.3;">${escapeHtml(photoTitle)}</div>
+              ${caption ? `
+                <div class="gallery-desc-text ${isLongCap ? 'collapsed' : ''}" id="${capId}">${escapeHtml(caption)}</div>
+                ${isLongCap ? `
+                  <button type="button" class="btn-gallery-more" id="${btnCapId}" onclick="toggleGalleryCaption('${capId}', '${btnCapId}')">
+                    <span>See more</span> <i class="fa-solid fa-chevron-down" style="font-size:0.65rem;"></i>
+                  </button>
+                ` : ''}
+              ` : ''}
+            </div>
+          `;
+
+          const imgEl = item.querySelector('img');
+          imgEl.addEventListener('click', () => {
+            openPublicLightbox(imgSrc, `${post.title}${post.caption ? ' — ' + post.caption : ''}`);
+          });
+
+          container.insertBefore(item, container.firstChild);
+        });
+      });
+
+      // 6. If no photos found at all
+      if (renderedUrls.size === 0) {
+        container.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: var(--slate);">
+            <i class="fa-regular fa-images" style="font-size: 2.5rem; color: var(--brass); margin-bottom: 1rem; display: block;"></i>
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--ink);">No Photos Published Yet</div>
+            <p style="font-size: 0.85rem; margin-top: 0.4rem; color: var(--slate);">Photos added by admins in the Supabase Gallery will appear here automatically.</p>
+          </div>
+        `;
+      }
+    });
+  </script>
+
+  <!-- ====== NAVIGATION SCRIPT ====== -->
+
+  <!-- Mobile menu toggle — always placed last so all elements are available -->
+  <script src="js/nav.js"></script>
+</body>
+</html>
+

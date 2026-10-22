@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<!--
+  ============================================================
+  FILE: index.html
+  PAGE: Homepage / Landing Page
+  AUDIENCE: Public — any visitor, enrolled or not
+  PURPOSE: Presents the ROTCIMS system to the public.
+           Shows the hero section, system statistics, core
+           features, live announcements from Supabase, and
+           the Android APK download card.
+  SUPABASE TABLES:
+    - announcements (SELECT: is_published = true)
+    - profiles      (COUNT: role = 'cadet', status = 'approved')
+  SCRIPTS: config.js (Supabase client), nav.js (hamburger)
+  ============================================================
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROTCIMS — San Enrique ROTC Information & Management System</title>
+
+  <!-- ====== STYLESHEETS ====== -->
+  <!-- Base military theme: colors, layout, components -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Responsive breakpoints: mobile sidebar, hamburger nav -->
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Visual enhancements: animations, hero, stats, better cards, footer -->
+  <link rel="stylesheet" href="css/enhancements.css">
+
+  <!-- Font Awesome 6 — icon library used throughout the page -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- ====== SUPABASE CLIENT (must load before config.js) ====== -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- ROTCIMS Supabase configuration — initializes window.supabaseClient -->
+  <script src="js/config.js"></script>
+
+  <style>
+    /* ── Home Social Feed (Card-Based Layout — Posts as White Cards) ── */
+    .home-social-feed-wrap {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 0 0.5rem;
+    }
+    .home-social-card {
+      background: #fff;
+      border: 1px solid #dde3de;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+      border-radius: 16px;
+      width: 100%;
+      margin: 0 0 2rem 0;
+      padding: 0;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .home-social-card:last-child {
+      margin-bottom: 0;
+    }
+    .home-social-card:hover {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.11);
+    }
+    /* ── Post Header Banner (Shown on EVERY Post) ── */
+    .post-card-banner {
+      background: linear-gradient(135deg, #0a170e 0%, #173022 55%, #102418 100%);
+      padding: 0.85rem 1.4rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      border-bottom: 1px solid rgba(184, 142, 44, 0.25);
+    }
+    .post-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .post-banner-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid var(--brass);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .post-banner-name {
+      font-family: 'Oswald', sans-serif;
+      font-size: 1.15rem;
+      color: #fff;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      letter-spacing: 0.02em;
+      line-height: 1.2;
+    }
+    .post-banner-meta {
+      font-size: 0.76rem;
+      color: rgba(255, 255, 255, 0.75);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin-top: 0.2rem;
+      flex-wrap: wrap;
+    }
+    .post-banner-right {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .post-banner-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--brass);
+      background: rgba(184, 142, 44, 0.15);
+      border: 1px solid rgba(184, 142, 44, 0.35);
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .home-social-content {
+      padding: 1.4rem 1.75rem 1.25rem;
+    }
+    .home-social-title {
+      font-family: 'Oswald', sans-serif;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      line-height: 1.25;
+    }
+    .home-social-body {
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: #334155;
+      white-space: pre-line;
+      margin-bottom: 0.5rem;
+      position: relative;
+    }
+    /* Collapsed state: clamp to 4 lines with a smooth gradient fade */
+    .home-social-body.collapsed {
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .btn-see-more {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 1.1rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: color 0.15s ease;
+      font-family: inherit;
+    }
+    .btn-see-more:hover {
+      color: var(--brass);
+      text-decoration: underline;
+    }
+    .post-category-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+    .tag-gallery { background: #e0f2fe; color: #0284c7; }
+    .tag-events { background: #fef3c7; color: #b45309; }
+    .tag-announcements { background: #dcfce7; color: #15803d; }
+    .tag-requirements { background: #f3e8ff; color: #7e22ce; }
+
+    /* Expanded Collage Grid */
+    .home-collage-grid {
+      display: grid;
+      gap: 5px;
+      background: #0f172a;
+      overflow: hidden;
+      cursor: pointer;
+      width: 100%;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .home-collage-grid.count-1 { grid-template-columns: 1fr; max-height: 700px; }
+    .home-collage-grid.count-1 img { width: 100%; height: 100%; max-height: 700px; object-fit: cover; }
+    .home-collage-grid.count-2 { grid-template-columns: 1fr 1fr; height: 560px; }
+    .home-collage-grid.count-2 img { width: 100%; height: 100%; object-fit: cover; }
+    .home-collage-grid.count-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; height: 600px; }
+    .home-collage-grid.count-3 img:nth-child(1) { grid-row: span 2; width: 100%; height: 100%; object-fit: cover; }
+    .home-collage-grid.count-3 img:nth-child(2), .home-collage-grid.count-3 img:nth-child(3) { width: 100%; height: 100%; object-fit: cover; }
+    .home-collage-grid.count-4-plus { grid-template-columns: 1fr 1fr; grid-template-rows: 340px 340px; height: 680px; }
+    .home-collage-grid.count-4-plus .collage-item { position: relative; overflow: hidden; width: 100%; height: 100%; }
+    .home-collage-grid.count-4-plus .collage-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .home-collage-more {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: 'Oswald', sans-serif;
+      font-size: 3.25rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+      user-select: none;
+      transition: background .2s;
+    }
+    .home-collage-more:hover { background: rgba(0,0,0,0.5); }
+
+    /* Lightbox Modal */
+    #home-lightbox-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+    }
+    #home-lightbox-modal.active { display: flex; }
+    #home-lightbox-img {
+      max-width: 90vw;
+      max-height: 85vh;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      user-select: none;
+    }
+    .home-lightbox-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 1.5rem;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .home-lightbox-btn:hover { background: rgba(255,255,255,0.4); }
+    #home-lightbox-prev { left: 1.5rem; }
+    #home-lightbox-next { right: 1.5rem; }
+    #home-lightbox-close {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: rgba(255,255,255,0.25);
+      color: #fff;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      font-size: 1.25rem;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+    }
+    #home-lightbox-counter {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 0.4rem 1.2rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* ── Hero Video Backdrop Styles ── */
+    .hero-video-backdrop {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+      z-index: 0;
+      pointer-events: none;
+      filter: brightness(0.65) contrast(1.1);
+    }
+    .hero-video-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(6, 14, 9, 0.82) 0%, rgba(13, 31, 21, 0.72) 45%, rgba(18, 36, 25, 0.82) 100%);
+      z-index: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ====== SITE HEADER / TOP NAVIGATION ====== -->
+  <!--
+    The header is sticky (stays at top as you scroll).
+    On desktop: all nav links are visible in a row.
+    On mobile (<900px): nav collapses behind the ☰ hamburger button.
+    nav.js handles the toggle logic.
+  -->
+  <header class="site-header">
+    <!-- Brand: logo + system name -->
+    <div class="brand">
+      <img src="assets/logo.png" alt="San Enrique ROTC Logo" onerror="this.src='assets/icon.png'">
+      <div class="brand-text">
+        ROTCIMS
+        <span>San Enrique ROTC Unit</span>
+      </div>
+    </div>
+
+    <!-- Hamburger button — only visible on mobile (shown via responsive.css) -->
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+
+    <!-- Main navigation links -->
+    <nav id="site-nav">
+      <ul class="nav-links">
+        <li><a href="index.html" class="active">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="requirements.html">Requirements</a></li>
+        <li><a href="benefits.html">Benefits</a></li>
+        <li><a href="events.html">Events</a></li>
+        <li><a href="gallery.html">Gallery</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="downloads/san-enrique-rotc.apk"><i class="fa-brands fa-android"></i> Android App</a></li>
+        <li>
+          <a href="login.html" class="nav-btn btn-join-now">
+            <i class="fa-solid fa-right-to-bracket"></i> JOIN NOW
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+
+  <!-- ====== HERO SECTION ====== -->
+  <!--
+    Full-screen dark military hero with:
+    - CSS grid-line pattern overlay (::before pseudo-element in enhancements.css)
+    - Radial brass glow (::after pseudo-element)
+    - Animated badge, title with gradient accent, subtitle, two CTAs
+  -->
+  <section class="hero-section">
+    <!-- Video Backdrop -->
+    <video class="hero-video-backdrop" autoplay loop muted playsinline poster="assets/logo.png">
+      <source src="backdrop.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+    <!-- Video Tint / Gradient Overlay -->
+    <div class="hero-video-overlay"></div>
+
+    <!-- Content sits above the CSS overlays (z-index: 1) -->
+    <div class="hero-content">
+
+      <!-- Small military-style badge above the heading -->
+      <div class="hero-badge">
+        <i class="fa-solid fa-shield-halved"></i>
+        Department of Military Science &amp; Tactics
+      </div>
+
+      <!-- Main heading — "ROTCIMS" uses the gradient shimmer accent style -->
+      <h1 class="hero-title">
+        Reserve Officers' Training Corps<br>
+        <span class="accent">Information &amp; Management System</span>
+      </h1>
+
+      <!-- Supporting description -->
+      <p class="hero-subtitle">
+        Centralized management of cadets, personnel records, QR code drill attendance,
+        announcements, and official ROTC documents — all in one secure platform
+        for the San Enrique ROTC program.
+      </p>
+
+      <!-- Call-to-action buttons -->
+      <div class="hero-actions">
+        <!-- Primary CTA: opens the login portal -->
+        <a href="login.html" class="btn btn-brass btn-hero">
+          <i class="fa-solid fa-door-open"></i> Access Cadet Portal
+        </a>
+        <!-- Secondary CTA: goes to the registration form -->
+        <a href="register.html" class="btn-hero-outline">
+          <i class="fa-solid fa-user-plus"></i> Register as Cadet
+        </a>
+      </div>
+
+      <!-- Scroll hint arrow to encourage the user to scroll -->
+      <p style="color: rgba(255,255,255,0.3); font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase;">
+        ↓ &nbsp; Scroll to explore
+      </p>
+
+    </div>
+  </section>
+
+
+  <!-- ====== CONTINUOUS ROLLING CDC UNIT LOGOS MARQUEE ====== -->
+  <!--
+    Replaces the previous stats strip with an infinite, smooth rolling
+    ribbon displaying the official 6RCDG Community Defense Center (CDC) logos
+    and their official unit designations beneath each emblem.
+  -->
+  <section class="cdc-marquee-section">
+    <div class="cdc-marquee-header">
+      <span class="cdc-marquee-eyebrow">6th Regional Community Defense Group • ARESCOM</span>
+      <h2 class="cdc-marquee-title">Community Defense Centers &amp; Line Units</h2>
+    </div>
+
+    <div class="marquee-container">
+      <div class="marquee-track">
+        
+        <!-- Track Set 1 -->
+        <div class="cdc-logo-card">
+          <img src="logo/601st (aklan) community defense center.png" alt="601st CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">601st (Aklan) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/602nd (capiz) community defense center.png" alt="602nd CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">602nd (Capiz) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/603rd (antique) community defense center.png" alt="603rd CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">603rd (Antique) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/604th (iloilo) community defense center.png" alt="604th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">604th (Iloilo) CDC</div>
+          <div class="cdc-logo-sub">San Enrique Mother Unit</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/605th (negros) community defense center.png" alt="605th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">605th (Negros) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/606th (guimaras) community defense center.png" alt="606th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">606th (Guimaras) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card">
+          <img src="logo/6th (iloilo) community defense center.png" alt="6th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">6th (Iloilo) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <!-- Track Set 2 (Exact Duplicate for seamless infinite continuous rolling) -->
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/601st (aklan) community defense center.png" alt="601st CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">601st (Aklan) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/602nd (capiz) community defense center.png" alt="602nd CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">602nd (Capiz) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/603rd (antique) community defense center.png" alt="603rd CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">603rd (Antique) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/604th (iloilo) community defense center.png" alt="604th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">604th (Iloilo) CDC</div>
+          <div class="cdc-logo-sub">San Enrique Mother Unit</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/605th (negros) community defense center.png" alt="605th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">605th (Negros) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/606th (guimaras) community defense center.png" alt="606th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">606th (Guimaras) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+        <div class="cdc-logo-card" aria-hidden="true">
+          <img src="logo/6th (iloilo) community defense center.png" alt="6th CDC" class="cdc-logo-img">
+          <div class="cdc-logo-name">6th (Iloilo) CDC</div>
+          <div class="cdc-logo-sub">Community Defense Center</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ====== COMMAND DISPATCHES FEED ====== -->
+  <section style="background: #f0f2f0; padding: 3rem 0.75rem 4rem; border-bottom: 1px solid var(--mist);">
+    <div class="home-social-feed-wrap">
+
+      <!-- Section Title & Quick Actions -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; padding: 0 0.5rem;">
+        <div>
+          <p class="section-eyebrow" style="margin-bottom: 0.25rem;">Official Unit Dispatches</p>
+          <h2 class="section-heading" style="margin-bottom: 0;">Command Announcements &amp; Updates</h2>
+        </div>
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+          <a href="gallery.html" class="btn btn-brass" style="padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 600;">
+            <i class="fa-solid fa-images"></i> Full Gallery
+          </a>
+          <a href="events.html" class="btn btn-outline" style="padding: 0.45rem 1rem; font-size: 0.82rem; font-weight: 600; background: #fff;">
+            <i class="fa-solid fa-calendar-day"></i> Drill Calendar
+          </a>
+        </div>
+      </div>
+
+      <!-- ─── Posts Feed List (Each post is rendered with its OWN Unit Banner) ─── -->
+      <div id="home-posts-feed-container">
+        <!-- Loading spinner -->
+        <div style="text-align: center; padding: 3rem; color: var(--slate); font-size: 0.95rem; background: #fff; border-radius: 16px; border: 1px solid #dde3de;">
+          <i class="fa-solid fa-spinner fa-spin" style="color: var(--brass); font-size: 1.5rem; margin-bottom: 0.75rem; display: block;"></i>
+          Loading unit dispatches…
+        </div>
+      </div>
+
+      <!-- Bottom action link (Standalone card footer) -->
+      <div style="text-align: center; margin-top: 2rem;">
+        <a href="gallery.html" class="btn btn-outline" style="padding: 0.75rem 2rem; font-size: 0.92rem; background: #fff; border-radius: 999px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #dde3de;">
+          <i class="fa-solid fa-images" style="color: var(--brass); margin-right: 0.5rem;"></i> Explore Full Photo Gallery →
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ====== LATEST EVENTS SECTION ====== -->
+  <!--
+    Fetches the 3 most recently PUBLISHED events from Supabase.
+    Table: events | Filter: is_published = true | Order: created_at DESC
+    Displays: title, description, location, date, time
+    Ordered by latest published (created_at), NOT by event_date.
+  -->
+  <section style="background: var(--bg); padding: 5rem 1.5rem;">
+    <div style="max-width: 1100px; margin: 0 auto;">
+
+      <!-- Section header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p class="section-eyebrow">Training Schedule</p>
+          <h2 class="section-heading" style="margin-bottom: 0;">Latest Events &amp; Formation Drills</h2>
+        </div>
+        <a href="events.html" class="btn btn-outline btn-sm">
+          View All Events <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i>
+        </a>
+      </div>
+
+      <!-- Dynamic event cards — populated by loadHomeEvents() in JS -->
+      <div id="home-events-container" style="display: grid; gap: 1.25rem;">
+        <!-- Loading placeholder -->
+        <div style="text-align: center; padding: 3rem; color: var(--slate); grid-column: 1 / -1; font-size: 0.9rem;">
+          <i class="fa-solid fa-spinner fa-spin" style="color: var(--brass); font-size: 1.5rem; margin-bottom: 0.75rem; display: block;"></i>
+          Loading formation schedule…
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ====== LIVE ANNOUNCEMENTS SECTION ====== -->
+  <!--
+    Fetches the 3 most recent published announcements from Supabase.
+    Table: announcements | Filter: is_published = true | Order: created_at DESC
+    Shows a loading placeholder while fetching, then renders cards dynamically.
+  -->
+  <section style="background: var(--paper); border-top: 1px solid var(--mist); border-bottom: 1px solid var(--mist); padding: 5rem 1.5rem;">
+    <div style="max-width: 1100px; margin: 0 auto;">
+
+      <!-- Section header with link to portal -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <p class="section-eyebrow">Official Unit Notices</p>
+          <h2 class="section-heading" style="margin-bottom: 0;">Announcements &amp; Directives</h2>
+        </div>
+        <a href="login.html" class="btn btn-outline btn-sm">
+          View All in Portal <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i>
+        </a>
+      </div>
+
+      <!-- Dynamic announcement cards — populated by JS below -->
+      <div id="announcements-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem;">
+        <!-- Loading placeholder (replaced by JS) -->
+        <div style="text-align: center; padding: 3rem; color: var(--slate); grid-column: 1 / -1; font-size: 0.9rem;">
+          <i class="fa-solid fa-spinner fa-spin" style="color: var(--brass); font-size: 1.5rem; margin-bottom: 0.75rem; display: block;"></i>
+          Loading official unit notices…
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ====== ANDROID APK DOWNLOAD SECTION ====== -->
+  <!--
+    Styled with a dark green military background + dot pattern.
+    The phone icon uses a floating CSS animation (defined in enhancements.css).
+    APK file: downloads/san-enrique-rotc.apk (83.7 MB)
+  -->
+  <section class="apk-section">
+    <div class="apk-inner">
+
+      <!-- Floating phone icon -->
+      <div class="apk-icon">📲</div>
+
+      <h2>ROTCIMS Android Mobile App</h2>
+      <p>
+        Cadets and platoon leaders can check formation schedules, display their
+        digital QR ID card, scan attendance, and view official unit notices —
+        all from their Android smartphone.
+      </p>
+
+      <!-- Download button -->
+      <a href="downloads/san-enrique-rotc.apk" class="btn btn-brass btn-hero">
+        <i class="fa-solid fa-download"></i> Download Android APK
+      </a>
+
+      <!-- Info badges below the button -->
+      <div class="apk-badges">
+        <span class="apk-badge"><i class="fa-brands fa-android"></i> Android 10+</span>
+        <span class="apk-badge"><i class="fa-solid fa-weight-hanging"></i> 83.9 MB</span>
+        <span class="apk-badge"><i class="fa-solid fa-lock"></i> Direct Install</span>
+        <span class="apk-badge"><i class="fa-solid fa-qrcode"></i> QR Scanner Included</span>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ====== ENHANCED FOOTER ====== -->
+  <!--
+    Multi-column footer with:
+    - Left: brand description
+    - Middle columns: quick navigation links grouped by type
+    - Bottom bar: copyright + tech stack badge
+  -->
+  <footer class="site-footer">
+
+    <!-- Four-column footer grid -->
+    <div class="footer-grid">
+
+      <!-- Column 1: Brand info -->
+      <div class="footer-brand">
+        <div class="brand-name">ROTCIMS</div>
+        <div class="brand-sub">San Enrique ROTC Unit</div>
+        <p>
+          Reserve Officers' Training Corps Information and Management System.
+          Built to modernize ROTC operations at the San Enrique campus under
+          Republic Act No. 9163.
+        </p>
+      </div>
+
+      <!-- Column 2: Public pages -->
+      <div class="footer-col">
+        <h4>Information</h4>
+        <ul>
+          <li><a href="about.html">About ROTC</a></li>
+          <li><a href="requirements.html">Requirements</a></li>
+          <li><a href="benefits.html">Benefits</a></li>
+          <li><a href="events.html">Events &amp; Training</a></li>
+          <li><a href="gallery.html">Gallery</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 3: Portal access -->
+      <div class="footer-col">
+        <h4>Portal</h4>
+        <ul>
+          <li><a href="login.html">Sign In</a></li>
+          <li><a href="register.html">Register Cadet</a></li>
+          <li><a href="events.html">Training Events</a></li>
+          <li><a href="contact.html">Contact HQ</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 4: System -->
+      <div class="footer-col">
+        <h4>System</h4>
+        <ul>
+          <li><a href="downloads/san-enrique-rotc.apk">Android APK</a></li>
+          <li><a href="cadet-dashboard.html">Cadet Portal</a></li>
+          <li><a href="admin-dashboard.html">Command Portal</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Bottom copyright bar -->
+    <div class="footer-bottom">
+      <p>
+        &copy; 2025 San Enrique ROTC Unit — Department of Military Science &amp; Tactics.
+        All rights reserved.
+      </p>
+      <span class="footer-badge">
+        <i class="fa-solid fa-code"></i> &nbsp;HTML5 · CSS3 · JavaScript · Supabase
+      </span>
+    </div>
+
+  </footer>
+
+
+  <!-- ====== PAGE SCRIPTS ====== -->
+  <script>
+    // ==================================================================
+    // SECTION: LIVE STATISTICS FROM SUPABASE
+    // Fetches real counts from the database and animates them as counters.
+    // Uses IntersectionObserver so the animation triggers only when
+    // the stats strip scrolls into the viewport.
+    // ==================================================================
+
+    // animateCount: smoothly counts from 0 to `target` over 1.5 seconds
+    function animateCount(el, target) {
+      const duration = 1500; // animation duration in ms
+      const step = Math.ceil(duration / target) || 1;
+      let current = 0;
+
+      const timer = setInterval(() => {
+        current += Math.max(1, Math.ceil(target / 60)); // increment per frame
+        if (current >= target) {
+          clearInterval(timer);
+          el.textContent = target.toLocaleString(); // final exact value with commas
+        } else {
+          el.textContent = current.toLocaleString();
+        }
+      }, step);
+    }
+
+    // loadStats: queries Supabase for live counts and populates the stat strip
+    async function loadStats() {
+      try {
+        // Count approved cadets (role = 'cadet', status = 'approved')
+        const { count: cadetCount } = await window.supabaseClient
+          .from('profiles')
+          .select('*', { count: 'exact', head: true }) // head:true = no row data, just count
+          .eq('role', 'cadet')
+          .eq('status', 'approved');
+
+        // Count personnel (role = 'personnel' or 'admin')
+        const { count: personnelCount } = await window.supabaseClient
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .in('role', ['personnel', 'admin']);
+
+        // Count total attendance sessions
+        const { count: sessionCount } = await window.supabaseClient
+          .from('attendance_sessions')
+          .select('*', { count: 'exact', head: true });
+
+        // Count published documents
+        const { count: docCount } = await window.supabaseClient
+          .from('documents')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_published', true);
+
+        // Store targets in data attributes if stat elements exist
+        const elCadets = document.getElementById('stat-cadets');
+        const elPersonnel = document.getElementById('stat-personnel');
+        const elSessions = document.getElementById('stat-sessions');
+        const elDocs = document.getElementById('stat-docs');
+
+        if (elCadets) elCadets.dataset.target = cadetCount || 0;
+        if (elPersonnel) elPersonnel.dataset.target = personnelCount || 0;
+        if (elSessions) elSessions.dataset.target = sessionCount || 0;
+        if (elDocs) elDocs.dataset.target = docCount || 0;
+
+      } catch (err) {
+        // If Supabase is unreachable, stats stay at 0 — no crash
+        console.warn('Stats load failed:', err.message);
+      }
+    }
+
+    // ==================================================================
+    // SECTION: LIVE ANNOUNCEMENTS FROM SUPABASE
+    // Fetches up to 3 published announcements and renders them as cards.
+    // Supports cover images and priority color indicators.
+    // ==================================================================
+    async function loadAnnouncements() {
+      const container = document.getElementById('announcements-container');
+
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('announcements')
+          .select('id, title, content, category, priority, created_at, image_url')
+          .eq('is_published', true)              // only published notices
+          .order('created_at', { ascending: false }) // newest first
+          .limit(3);                             // show at most 3 cards
+
+        // If error or empty, show a friendly empty state
+        if (error || !data || data.length === 0) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:3rem; color:var(--slate); grid-column:1/-1;">
+              <i class="fa-solid fa-bullhorn" style="font-size:2rem; margin-bottom:0.75rem; display:block; opacity:0.3;"></i>
+              No announcements posted yet.
+            </div>`;
+          return;
+        }
+
+        // Priority color mapping — red for urgent, brass for normal
+        const priorityColor = {
+          urgent: 'var(--danger)',
+          high:   '#d97706',
+          normal: 'var(--brass)',
+          low:    'var(--slate)'
+        };
+
+        // Render each announcement as a styled card with optional image banner
+        container.innerHTML = data.map(item => `
+          <div class="announcement-card reveal" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+            ${item.image_url ? `
+              <div class="ann-image-cover" style="background-image: url('${item.image_url}');"></div>
+            ` : ''}
+            <div style="padding: 1.5rem; flex: 1; display: flex; flex-direction: column;">
+              <div class="ann-header">
+                <span class="ann-category">${item.category || 'General'}</span>
+                <span class="ann-date">
+                  <i class="fa-regular fa-calendar" style="font-size:0.7rem;"></i>
+                  ${new Date(item.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
+              <h3>${item.title}</h3>
+              <p style="flex: 1; margin-bottom: 0.75rem;">${item.content.substring(0, 160)}${item.content.length > 160 ? '…' : ''}</p>
+              <div class="ann-priority" style="color: ${priorityColor[item.priority] || 'var(--brass)'}; margin-top: auto;">
+                <i class="fa-solid fa-circle-exclamation" style="font-size:0.7rem;"></i>
+                Priority: ${(item.priority || 'normal').toUpperCase()}
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        // Trigger scroll-reveal on newly created cards
+        observeReveal();
+
+      } catch (err) {
+        console.error('Announcements load failed:', err);
+        container.innerHTML = `
+          <div style="text-align:center; padding:2rem; color:var(--slate); grid-column:1/-1;">
+            Unable to connect to announcements service. Check your connection.
+          </div>`;
+      }
+    }
+
+    // ==================================================================
+    // SECTION: LATEST EVENTS FROM SUPABASE
+    // Fetches up to 3 most recently PUBLISHED events and renders them
+    // as horizontal cards with a date badge, title, location, and time.
+    // Ordered by created_at DESC so newest-published shows first.
+    // ==================================================================
+    async function loadHomeEvents() {
+      const container = document.getElementById('home-events-container');
+      if (!container) return;
+
+      try {
+        const { data: events, error } = await window.supabaseClient
+          .from('events')
+          .select('id, title, description, location, event_date, start_time, end_time, uniform_info, image_url')
+          .eq('is_published', true)
+          .order('created_at', { ascending: false })  // latest PUBLISHED first
+          .limit(3);
+
+        if (error || !events || events.length === 0) {
+          container.innerHTML = `
+            <div style="text-align:center; padding:3rem; color:var(--slate); grid-column:1/-1;">
+              <i class="fa-solid fa-calendar-xmark" style="font-size:2rem; margin-bottom:0.75rem; display:block; opacity:0.3;"></i>
+              No upcoming events posted yet.
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = events.map(e => renderHomeEventCard(e)).join('');
+        observeReveal();
+
+      } catch (err) {
+        console.warn('Events load failed:', err);
+        container.innerHTML = `
+          <div style="text-align:center; padding:2rem; color:var(--slate); grid-column:1/-1;">
+            Unable to load events. Check your connection.
+          </div>`;
+      }
+    }
+
+    // renderHomeEventCard — builds the HTML for a single event row-card
+    function renderHomeEventCard(e) {
+      const dateObj  = e.event_date ? new Date(e.event_date + 'T00:00:00') : null;
+      const day      = dateObj ? dateObj.getDate() : '—';
+      const month    = dateObj ? dateObj.toLocaleString('en-PH', { month: 'short' }).toUpperCase() : '';
+      const weekday  = dateObj ? dateObj.toLocaleString('en-PH', { weekday: 'long' }) : '';
+      const fullDate = dateObj ? dateObj.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : 'TBA';
+
+      function fmtTime(t) {
+        if (!t) return '';
+        const [h, m] = t.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const hr12 = h % 12 || 12;
+        return `${hr12}:${String(m).padStart(2, '0')} ${ampm}`;
+      }
+      const timeStr = e.start_time
+        ? `${fmtTime(e.start_time)}${e.end_time ? ' – ' + fmtTime(e.end_time) : ''}`
+        : '';
+      const desc = (e.description || '').substring(0, 140) + ((e.description || '').length > 140 ? '…' : '');
+
+      return `
+        <div class="card reveal" style="padding:0; overflow:hidden; display:flex; flex-direction:row; flex-wrap:wrap; border-left:4px solid var(--brass);">
+          ${e.image_url ? `
+            <div style="width:100%; height:180px; background:url('${e.image_url}') center/cover no-repeat; flex-shrink:0;"></div>
+          ` : ''}
+          <!-- Green date badge column -->
+          <div style="background:linear-gradient(160deg,#0f2015,#1e3a29); padding:1.25rem 1.1rem; display:flex; flex-direction:column; align-items:center; justify-content:center; min-width:88px; flex-shrink:0;">
+            <div style="font-size:0.6rem; font-weight:700; text-transform:uppercase; color:#c8a84b; letter-spacing:0.1em; white-space:nowrap;">Formation</div>
+            <div style="font-family:'Oswald',sans-serif; font-size:2rem; font-weight:700; color:#fff; line-height:1.05;">${day}</div>
+            <div style="font-size:0.68rem; font-weight:700; color:#c8a84b; text-transform:uppercase; letter-spacing:0.06em;">${month}</div>
+          </div>
+          <!-- Event content column -->
+          <div style="flex:1; min-width:200px; padding:1.25rem 1.4rem; display:flex; flex-direction:column; gap:0.3rem;">
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-bottom:0.15rem;">
+              <span style="background:var(--primary); color:#fff; font-size:0.68rem; font-weight:700; padding:0.18rem 0.55rem; border-radius:4px; text-transform:uppercase; letter-spacing:0.05em;">Event</span>
+              <span style="font-size:0.72rem; color:var(--slate); font-weight:600;">${weekday}${weekday && fullDate ? ', ' : ''}${fullDate}</span>
+            </div>
+            <h3 style="font-family:'Oswald',sans-serif; font-size:1.15rem; color:var(--ink); margin:0 0 0.3rem;">${e.title}</h3>
+            ${desc ? `<p style="font-size:0.84rem; color:var(--slate); margin:0 0 0.55rem; line-height:1.55;">${desc}</p>` : ''}
+            <div style="display:flex; flex-wrap:wrap; gap:1rem; font-size:0.78rem; color:var(--slate); margin-top:auto;">
+              ${e.location    ? `<span><i class="fa-solid fa-location-dot" style="color:var(--brass); margin-right:0.3rem;"></i>${e.location}</span>` : ''}
+              ${timeStr       ? `<span><i class="fa-regular fa-clock" style="color:var(--brass); margin-right:0.3rem;"></i>${timeStr}</span>` : ''}
+              ${e.uniform_info ? `<span><i class="fa-solid fa-shirt" style="color:var(--brass); margin-right:0.3rem;"></i>${e.uniform_info}</span>` : ''}
+            </div>
+          </div>
+          <!-- View Details button -->
+          <div style="display:flex; align-items:center; padding:1rem 1.25rem; flex-shrink:0;">
+            <a href="events.html" class="btn btn-outline btn-sm">View Details →</a>
+          </div>
+        </div>`;
+    }
+
+    // ==================================================================
+    // SECTION: INTERSECTION OBSERVER — Scroll Reveal & Stat Counters
+    // Watches .reveal elements and adds .visible when they enter viewport.
+    // Also triggers stat counter animations when the stats strip appears.
+    // ==================================================================
+    function observeReveal() {
+      // Options: trigger when 10% of the element is visible
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible'); // triggers the CSS transition
+            observer.unobserve(entry.target);       // animate only once
+          }
+        });
+      }, { threshold: 0.1 });
+
+      // Observe every .reveal element on the page
+      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    }
+
+    // Stat counter observer — triggers number animation when strip is visible
+    function observeStats() {
+      const statNums = document.querySelectorAll('.stat-number');
+      const statObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const target = parseInt(entry.target.dataset.target) || 0;
+            if (target > 0) {
+              animateCount(entry.target, target);
+            }
+            statObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+
+      statNums.forEach(el => statObserver.observe(el));
+    }
+
+    // ==================================================================
+    // SECTION: COMMAND POSTS & SOCIAL DISPATCH FEED
+    // Loads dispatches from 'posts' table and renders Facebook-style
+    // cards with 2x2 multi-photo collages (+N more) and lightbox.
+    // ==================================================================
+    let homeLightboxImages = [];
+    // Helper to sanitize text preventing injection / reference errors
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+      });
+    }
+
+    let homeLightboxIndex = 0;
+
+    async function loadHomePosts() {
+      const feedContainer = document.getElementById('home-posts-feed-container');
+      if (!feedContainer) return;
+
+      const fallbackPosts = [{
+        id: 'sample-milestone',
+        title: 'A MILESTONE FILLED WITH DISCIPLINE, HONOR, AND PRIDE 🫡 🇵🇭',
+        caption: `Behind every sharp salute, every synchronized march, and every tactical drill is a cadet and command cadre who never gets tired of believing in our mission. Today, the 604th CDC San Enrique ROTC Family comes together to salute the courage, patience, and dedication of all participating cadets.
+
+Our tactical instructors and student officers guide us not only in the rules of military science and parade decorum, but also in the enduring values of duty, leadership, and patriotism that will define our generation. Your passion inspires us, and your commitment makes our ROTC journey meaningful.
+
+May this training assembly remind each cadet of the honor and responsibility we uphold for our school, our community, and the Republic of the Philippines.
+
+With honor and discipline, Your San Enrique ROTC Family 🫡`,
+        category: 'gallery',
+        album_name: '2nd Regular Instruction | ROTC Unit',
+        created_at: new Date().toISOString(),
+        images: [
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_0_va5nx8.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_1_q2tub5.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_2_sfelwb.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_3_41qhf6.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_4_jq3prp.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_5_e8lp02.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_6_wtoljw.jpg',
+          'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_7_lulloi.jpg'
+        ]
+      }];
+
+      let posts = [];
+
+      try {
+        if (window.supabaseClient) {
+          const { data, error } = await window.supabaseClient
+            .from('posts')
+            .select('*')
+            .eq('is_published', true)
+            .order('created_at', { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            posts = data;
+          }
+        }
+      } catch (queryErr) {
+        console.warn('Posts fetch notice (using fallback):', queryErr);
+      }
+
+      if (posts.length === 0) {
+        posts = fallbackPosts;
+      }
+
+      try {
+        feedContainer.innerHTML = posts.map((post, idx) => {
+          const dateStr = post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
+          }) : 'Recent';
+          const tagClass = `tag-${post.category || 'gallery'}`;
+          const imagesArr = Array.isArray(post.images) ? post.images : [];
+          const caption = post.caption || '';
+          const isLong = caption.length > 220 || caption.split('\n').length > 4;
+          const bodyId = `post-body-${post.id || idx}`;
+          const btnId = `post-btn-${post.id || idx}`;
+
+          return `
+            <div class="home-social-card reveal">
+              <!-- ─── Post Header Banner (Shown on EVERY Post) ─── -->
+              <div class="post-card-banner">
+                <div class="post-banner-left">
+                  <img src="assets/logo.png" alt="San Enrique ROTC Logo" class="post-banner-logo" onerror="this.src='assets/icon.png'">
+                  <div>
+                    <div class="post-banner-name">
+                      San Enrique ROTC Unit
+                      <i class="fa-solid fa-circle-check" style="color: #38bdf8; font-size: 0.9rem;" title="Official Verified Unit"></i>
+                    </div>
+                    <div class="post-banner-meta">
+                      <span><i class="fa-regular fa-clock"></i> ${dateStr}</span>
+                      <span>&bull;</span>
+                      <span class="post-category-tag ${tagClass}">${escapeHtml(post.category || 'Dispatches')}</span>
+                      <span>&bull;</span>
+                      <span><i class="fa-solid fa-earth-americas" style="color: #38bdf8;"></i> Public</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="post-banner-right">
+                  <span class="post-banner-badge"><i class="fa-solid fa-shield-halved" style="color: var(--brass);"></i> 1st Instruction</span>
+                </div>
+              </div>
+
+              <!-- Post Content -->
+              <div class="home-social-content">
+                <div class="home-social-title">${escapeHtml(post.title)}</div>
+                <div class="home-social-body ${isLong ? 'collapsed' : ''}" id="${bodyId}">${escapeHtml(caption)}</div>
+                ${isLong ? `
+                  <button type="button" class="btn-see-more" id="${btnId}" onclick="togglePostCaption('${bodyId}', '${btnId}')">
+                    <span>See more</span> <i class="fa-solid fa-chevron-down" style="font-size:0.75rem;"></i>
+                  </button>
+                ` : ''}
+              </div>
+
+              <!-- Collage Grid -->
+              ${imagesArr.length > 0 ? `
+                <div id="home-collage-${post.id}"></div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+
+        // Attach collage layouts
+        posts.forEach(post => {
+          const imagesArr = Array.isArray(post.images) ? post.images : [];
+          if (imagesArr.length > 0) {
+            const container = document.getElementById(`home-collage-${post.id}`);
+            if (container) renderHomeCollage(container, imagesArr);
+          }
+        });
+
+      } catch (err) {
+        console.warn('loadHomePosts error:', err);
+        if (feedContainer.innerHTML.includes('Loading')) {
+          feedContainer.innerHTML = `
+            <div class="home-social-card">
+              <!-- Post Header Banner -->
+              <div class="post-card-banner">
+                <div class="post-banner-left">
+                  <img src="assets/logo.png" alt="San Enrique ROTC Logo" class="post-banner-logo" onerror="this.src='assets/icon.png'">
+                  <div>
+                    <div class="post-banner-name">
+                      San Enrique ROTC Unit
+                      <i class="fa-solid fa-circle-check" style="color: #38bdf8; font-size: 0.9rem;" title="Official Verified Unit"></i>
+                    </div>
+                    <div class="post-banner-meta">
+                      <span><i class="fa-regular fa-clock"></i> Recent</span>
+                      <span>&bull;</span>
+                      <span class="post-category-tag tag-gallery">Gallery</span>
+                      <span>&bull;</span>
+                      <span><i class="fa-solid fa-earth-americas" style="color: #38bdf8;"></i> Public</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="post-banner-right">
+                  <span class="post-banner-badge"><i class="fa-solid fa-shield-halved" style="color: var(--brass);"></i> 1st Instruction</span>
+                </div>
+              </div>
+
+              <div class="home-social-content">
+                <div class="home-social-title">A MILESTONE FILLED WITH DISCIPLINE, HONOR, AND PRIDE 🫡 🇵🇭</div>
+                <div class="home-social-body">Behind every sharp salute, every synchronized march, and every tactical drill is a cadet and command cadre who never gets tired of believing in our mission. Today, the 604th CDC San Enrique ROTC Family comes together to salute the courage, patience, and dedication of all participating cadets.
+
+Our tactical instructors and student officers guide us not only in the rules of military science and parade decorum, but also in the enduring values of duty, leadership, and patriotism that will define our generation.
+
+May this training assembly remind each cadet of the honor and responsibility we uphold for our school, our community, and the Republic of the Philippines.
+
+With honor and discipline, Your San Enrique ROTC Family 🫡</div>
+              </div>
+              <div id="home-fallback-collage"></div>
+            </div>
+          `;
+          const c = document.getElementById('home-fallback-collage');
+          if (c) renderHomeCollage(c, [
+            'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_0_va5nx8.jpg',
+            'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_1_q2tub5.jpg',
+            'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_2_sfelwb.jpg',
+            'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_3_41qhf6.jpg',
+            'https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_4_jq3prp.jpg'
+          ]);
+        }
+      }
+    }
+
+    function renderHomeCollage(container, images) {
+      container.className = 'home-collage-grid';
+      const total = images.length;
+      const imagesJson = JSON.stringify(images).replace(/"/g, '&quot;');
+
+      if (total === 1) {
+        container.classList.add('count-1');
+        container.innerHTML = `<img src="${images[0]}" alt="Photo 1" onclick="openHomeLightbox(0, ${imagesJson})">`;
+      } else if (total === 2) {
+        container.classList.add('count-2');
+        container.innerHTML = images.map((src, i) => `
+          <img src="${src}" alt="Photo ${i+1}" onclick="openHomeLightbox(${i}, ${imagesJson})">
+        `).join('');
+      } else if (total === 3) {
+        container.classList.add('count-3');
+        container.innerHTML = images.map((src, i) => `
+          <img src="${src}" alt="Photo ${i+1}" onclick="openHomeLightbox(${i}, ${imagesJson})">
+        `).join('');
+      } else {
+        container.classList.add('count-4-plus');
+        const moreCount = total - 4;
+        container.innerHTML = `
+          <div class="collage-item">
+            <img src="${images[0]}" alt="Photo 1" onclick="openHomeLightbox(0, ${imagesJson})">
+          </div>
+          <div class="collage-item">
+            <img src="${images[1]}" alt="Photo 2" onclick="openHomeLightbox(1, ${imagesJson})">
+          </div>
+          <div class="collage-item">
+            <img src="${images[2]}" alt="Photo 3" onclick="openHomeLightbox(2, ${imagesJson})">
+          </div>
+          <div class="collage-item" onclick="openHomeLightbox(3, ${imagesJson})">
+            <img src="${images[3]}" alt="Photo 4">
+            ${moreCount > 0 ? `<div class="home-collage-more">+${moreCount} more</div>` : ''}
+          </div>
+        `;
+      }
+    }
+
+    // ── See More / See Less Toggle ───────────────────────────────────
+    function togglePostCaption(bodyId, btnId) {
+      const body = document.getElementById(bodyId);
+      const btn = document.getElementById(btnId);
+      if (!body || !btn) return;
+
+      const isCollapsed = body.classList.contains('collapsed');
+      if (isCollapsed) {
+        body.classList.remove('collapsed');
+        btn.innerHTML = '<span>See less</span> <i class="fa-solid fa-chevron-up" style="font-size:0.75rem;"></i>';
+      } else {
+        body.classList.add('collapsed');
+        btn.innerHTML = '<span>See more</span> <i class="fa-solid fa-chevron-down" style="font-size:0.75rem;"></i>';
+      }
+    }
+
+    // ── Home Lightbox ─────────────────────────────────────────────────
+    function openHomeLightbox(index, images) {
+      homeLightboxImages = images;
+      homeLightboxIndex = index;
+      showHomeLightboxIndex(index);
+      document.getElementById('home-lightbox-modal').classList.add('active');
+    }
+
+    function showHomeLightboxIndex(index) {
+      if (!homeLightboxImages || homeLightboxImages.length === 0) return;
+      const imgEl = document.getElementById('home-lightbox-img');
+      const counterEl = document.getElementById('home-lightbox-counter');
+      imgEl.src = homeLightboxImages[index];
+      counterEl.textContent = `Photo ${index + 1} of ${homeLightboxImages.length}`;
+    }
+
+    function prevHomeLightboxImage() {
+      if (homeLightboxIndex > 0) homeLightboxIndex--;
+      else homeLightboxIndex = homeLightboxImages.length - 1;
+      showHomeLightboxIndex(homeLightboxIndex);
+    }
+
+    function nextHomeLightboxImage() {
+      if (homeLightboxIndex < homeLightboxImages.length - 1) homeLightboxIndex++;
+      else homeLightboxIndex = 0;
+      showHomeLightboxIndex(homeLightboxIndex);
+    }
+
+    function closeHomeLightbox() {
+      document.getElementById('home-lightbox-modal').classList.remove('active');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('home-lightbox-modal');
+      if (modal && modal.classList.contains('active')) {
+        if (e.key === 'Escape') closeHomeLightbox();
+        if (e.key === 'ArrowLeft') prevHomeLightboxImage();
+        if (e.key === 'ArrowRight') nextHomeLightboxImage();
+      }
+    });
+
+    // ==================================================================
+    // SECTION: INITIALIZATION — Run everything on page load
+    // ==================================================================
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Fetch stats, posts, events, and announcements concurrently for speed
+      await Promise.all([loadStats(), loadHomePosts(), loadHomeEvents(), loadAnnouncements()]);
+
+      // Set up scroll reveal for static elements
+      observeReveal();
+
+      // Set up stat counter animations
+      observeStats();
+    });
+  </script>
+
+  <!-- ====== FULLSCREEN HOME LIGHTBOX MODAL ====== -->
+  <div id="home-lightbox-modal">
+    <button id="home-lightbox-close" onclick="closeHomeLightbox()">✕</button>
+    <button class="home-lightbox-btn" id="home-lightbox-prev" onclick="prevHomeLightboxImage()">❮</button>
+    <img id="home-lightbox-img" src="" alt="Unit Photo">
+    <button class="home-lightbox-btn" id="home-lightbox-next" onclick="nextHomeLightboxImage()">❯</button>
+    <div id="home-lightbox-counter">Photo 1 of 1</div>
+  </div>
+
+  <!-- Mobile hamburger toggle — must be at the end of <body> -->
+  <script src="js/nav.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,625 @@
+<!--
+  ============================================================
+  FILE: events.html
+  PURPOSE: Public events, training assemblies, and Facebook-style
+           activity photo posts for the San Enrique ROTC Unit.
+           Includes interactive 2x2 photo collage with "+16 more"
+           overlay and full-screen photo lightbox viewer.
+  AUDIENCE: Enrolled cadets, prospective students, parents, and officers.
+  SUPABASE TABLES USED:
+    - events → fetches published upcoming training formation drills
+  DEPENDENCIES:
+    css/style.css, css/responsive.css, css/enhancements.css
+    js/config.js, js/nav.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events &amp; Training Posts — San Enrique ROTC Unit</title>
+
+  <!-- Global styles -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Visual enhancements: animations, Facebook post styles, lightbox -->
+  <link rel="stylesheet" href="css/enhancements.css">
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+</head>
+<body>
+
+  <!-- ====== HEADER / NAVIGATION ====== -->
+  <header class="site-header">
+    <div class="brand">
+      <img src="assets/logo.png" alt="ROTC Logo" onerror="this.src='assets/icon.png'">
+      <div class="brand-text">
+        ROTCIMS
+        <span>San Enrique ROTC Unit</span>
+      </div>
+    </div>
+
+    <!-- Mobile Hamburger Toggle -->
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">&#9776;</button>
+
+    <nav id="site-nav">
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="requirements.html">Requirements</a></li>
+        <li><a href="benefits.html">Benefits</a></li>
+        <li><a href="events.html" class="active">Events</a></li>
+        <li><a href="gallery.html">Gallery</a></li>
+        <li><a href="contact.html">Contact</a></li>
+        <li><a href="downloads/san-enrique-rotc.apk">Android App</a></li>
+        <!-- Replaced separate Sign In & Register with single prominent JOIN NOW button -->
+        <li>
+          <a href="login.html" class="nav-btn btn-join-now">
+            <i class="fa-solid fa-right-to-bracket"></i> JOIN NOW
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- ====== PAGE HERO HEADER BANNER ====== -->
+  <section class="page-header-banner">
+    <div class="page-header-content">
+      <div class="page-header-badge">
+        <i class="fa-solid fa-calendar-days"></i> Cadet Operations &amp; Highlights
+      </div>
+      <h1 class="page-header-title">
+        Events, Assemblies &amp; <span class="accent">Field Drills</span>
+      </h1>
+      <p class="page-header-subtitle">
+        Official dispatch of tactical formation assemblies, cadet ceremonies, and real-time field training updates from the San Enrique ROTC Unit.
+      </p>
+      <div class="page-breadcrumbs">
+        <a href="index.html">Home</a>
+        <span>&bull;</span>
+        <span>Events &amp; Drills</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== MAIN CONTENT AREA ====== -->
+  <main style="max-width: 960px; margin: 3rem auto; padding: 0 1.5rem;">
+
+    <!-- ============================================================== -->
+    <!-- SECTION 1: FACEBOOK-STYLE FEATURED EVENT POSTS                  -->
+    <!-- Matches the exact reference design:                             -->
+    <!--   - Page avatar, Title, Date & Public Globe badge              -->
+    <!--   - Headline & narrative caption                                -->
+    <!--   - 2x2 multi-photo collage with "+X more" dark overlay         -->
+    <!--   - Brass "View All Photos" button                              -->
+    <!--   - Interactive fullscreen lightbox                             -->
+    <!-- ============================================================== -->
+    <div id="fb-posts-feed" style="display: grid; gap: 2rem;">
+      <div class="fb-post-card" id="default-fb-card">
+        
+        <!-- Post Header -->
+        <div class="fb-post-header">
+          <img src="assets/logo.png" alt="Unit Avatar" class="fb-post-avatar" onerror="this.src='assets/icon.png'">
+          <div class="fb-post-meta">
+            <div class="fb-post-author">
+              San Enrique ROTC Unit
+              <i class="fa-solid fa-circle-check verified-badge" title="Official Verified Unit"></i>
+            </div>
+            <div class="fb-post-sub">
+              <span><i class="fa-regular fa-calendar"></i> 2nd Regular Instruction | ROTC Unit</span>
+              <span>&bull;</span>
+              <span><i class="fa-solid fa-globe"></i> Public</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Post Body / Narrative Caption -->
+        <div class="fb-post-body">
+          <div class="fb-post-headline">
+            IN PHOTOS || 20 September 2026 – 2ND REGULAR INSTRUCTION | ROTC UNIT 🫡🇵🇭
+          </div>
+          <div class="fb-post-caption">
+            <p>
+              Behind every sharp salute, every synchronized march, and every tactical drill is a cadet and command cadre who never gets tired of believing in our mission. Today, the 604th CDC San Enrique ROTC Family comes together to salute the courage, patience, and dedication of all participating cadets.
+            </p>
+            <p>
+              Our tactical instructors and student officers guide us not only in the rules of military science and parade decorum, but also in the enduring values of duty, leadership, and patriotism that will define our generation. Your passion inspires us, and your commitment makes our ROTC journey meaningful.
+            </p>
+            <p>
+              May this training assembly remind each cadet of the honor and responsibility we uphold for our school, our community, and the Republic of the Philippines.
+            </p>
+          </div>
+          <div class="fb-post-signoff">
+            With honor and discipline, Your San Enrique ROTC Family 🎖️
+          </div>
+        </div>
+
+        <!-- 2x2 Multi-Photo Collage (4 visible tiles, 4th has "+4 more" overlay) -->
+        <div class="fb-photo-grid">
+          <!-- Photo 1: Top-Left -->
+          <div class="fb-photo-tile" onclick="openEventLightbox(0, defaultPhotos, '2nd Regular Instruction')">
+            <img src="https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_0_va5nx8.jpg" alt="Instruction Photo 1" onerror="this.src='assets/logo.png'">
+          </div>
+          <!-- Photo 2: Top-Right -->
+          <div class="fb-photo-tile" onclick="openEventLightbox(1, defaultPhotos, '2nd Regular Instruction')">
+            <img src="https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_1_q2tub5.jpg" alt="Instruction Photo 2" onerror="this.src='assets/logo.png'">
+          </div>
+          <!-- Photo 3: Bottom-Left -->
+          <div class="fb-photo-tile" onclick="openEventLightbox(2, defaultPhotos, '2nd Regular Instruction')">
+            <img src="https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_2_sfelwb.jpg" alt="Instruction Photo 3" onerror="this.src='assets/logo.png'">
+          </div>
+          <!-- Photo 4: Bottom-Right with "+4 more" overlay -->
+          <div class="fb-photo-tile" onclick="openEventLightbox(3, defaultPhotos, '2nd Regular Instruction')">
+            <img src="https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_3_41qhf6.jpg" alt="Instruction Photo 4" onerror="this.src='assets/logo.png'">
+            <div class="fb-photo-overlay">+4 more</div>
+          </div>
+        </div>
+
+        <!-- Post Footer Button -->
+        <div class="fb-post-footer">
+          <button class="fb-view-all-btn" onclick="openEventLightbox(0, defaultPhotos, '2nd Regular Instruction')">
+            <i class="fa-solid fa-images"></i> View All 8 Photos
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 2: UPCOMING FORMATION SCHEDULE CALENDAR                 -->
+    <!-- Live from Supabase events table or default fallback             -->
+    <!-- ============================================================== -->
+    <div style="margin-top: 3.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 style="font-family: 'Oswald', sans-serif; font-size: 1.6rem; color: var(--primary); margin: 0;">
+          Upcoming Drill &amp; Assembly Calendar
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--slate); margin: 0.25rem 0 0;">
+          Mark your calendars for mandatory weekend tactical assemblies and uniform inspections.
+        </p>
+      </div>
+      <a href="login.html" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-calendar-check"></i> Cadet Portal Login
+      </a>
+    </div>
+
+    <!-- Events List Container -->
+    <div id="events-container" style="display: grid; gap: 1.5rem;">
+      <div style="text-align: center; padding: 3rem; color: var(--slate);">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--brass); margin-bottom: 0.75rem; display: block;"></i>
+        Loading training calendar...
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- FULLSCREEN PHOTO LIGHTBOX MODAL (FACEBOOK STYLE)               -->
+  <!-- ============================================================== -->
+  <div id="fb-lightbox" class="fb-lightbox" onclick="handleLightboxBackdrop(event)">
+    <!-- Top Bar -->
+    <div class="fb-lightbox-topbar">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <img src="assets/logo.png" alt="Logo" style="width: 28px; height: 28px; border-radius: 50%;">
+        <span id="fb-lightbox-title" style="font-weight: 700; font-size: 0.95rem;">San Enrique ROTC Unit &bull; Activity Photos</span>
+      </div>
+      <div id="fb-lightbox-counter" class="fb-lightbox-counter">Photo 1 of 8</div>
+      <button class="fb-lightbox-close" onclick="closeEventLightbox()" aria-label="Close Lightbox">&times;</button>
+    </div>
+
+    <!-- Center Stage with Image & Nav Arrows -->
+    <div class="fb-lightbox-stage">
+      <button class="fb-lightbox-nav fb-lightbox-prev" onclick="prevLightboxPhoto()" aria-label="Previous Photo">&#10094;</button>
+      <img id="fb-lightbox-img" class="fb-lightbox-img" src="" alt="Full view photo">
+      <button class="fb-lightbox-nav fb-lightbox-next" onclick="nextLightboxPhoto()" aria-label="Next Photo">&#10095;</button>
+    </div>
+
+    <!-- Bottom Thumbnail Strip -->
+    <div id="fb-lightbox-thumbs" class="fb-lightbox-thumbs">
+      <!-- Generated dynamically by JavaScript -->
+    </div>
+  </div>
+
+  <!-- ====== FOOTER ====== -->
+  <footer style="background: var(--primary-dark); color: rgba(255,255,255,0.6); text-align: center; padding: 2.5rem 1.5rem; font-size: 0.85rem; margin-top: 4rem; border-top: 1px solid rgba(223,181,78,0.2);">
+    <p style="margin: 0 0 0.5rem; color: #fff; font-weight: 600;">San Enrique ROTC Unit • Department of Military Science &amp; Tactics (DMST)</p>
+    <p style="margin: 0; font-size: 0.78rem;">604th Community Defense Center • 6th Regional Community Defense Group, ARESCOM</p>
+  </footer>
+
+  <!-- ====== JAVASCRIPT: LIGHTBOX & EVENTS CALENDAR ====== -->
+  <script>
+    // Default instruction photos served from active Supabase Storage
+    const defaultPhotos = [
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_0_va5nx8.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_1_q2tub5.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_2_sfelwb.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_3_41qhf6.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_4_jq3prp.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_5_e8lp02.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_6_wtoljw.jpg",
+      "https://cntisxkugmvwsommzjom.supabase.co/storage/v1/object/public/gallery/posts/1792062467969_7_lulloi.jpg"
+    ];
+
+    let currentPhotos = [...defaultPhotos];
+    let currentPhotoIndex = 0;
+    const postsPhotoMap = {};
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Open Lightbox
+    window.openEventLightbox = function(index = 0, photoSource = null, title = null) {
+      if (Array.isArray(photoSource) && photoSource.length > 0) {
+        currentPhotos = photoSource;
+      } else if (typeof photoSource === 'string' && postsPhotoMap[photoSource]) {
+        currentPhotos = postsPhotoMap[photoSource];
+      } else if (!currentPhotos || currentPhotos.length === 0) {
+        currentPhotos = [...defaultPhotos];
+      }
+
+      currentPhotoIndex = Math.max(0, Math.min(index, currentPhotos.length - 1));
+      const lightbox = document.getElementById("fb-lightbox");
+      lightbox.classList.add("active");
+      document.body.style.overflow = "hidden";
+
+      if (title) {
+        const titleEl = document.getElementById("fb-lightbox-title");
+        if (titleEl) titleEl.textContent = `San Enrique ROTC Unit • ${title}`;
+      }
+
+      renderLightboxPhoto();
+      renderLightboxThumbs();
+    };
+
+    // Close Lightbox
+    window.closeEventLightbox = function() {
+      const lightbox = document.getElementById("fb-lightbox");
+      lightbox.classList.remove("active");
+      document.body.style.overflow = "";
+    };
+
+    // Previous Photo
+    window.prevLightboxPhoto = function() {
+      if (!currentPhotos || currentPhotos.length === 0) return;
+      currentPhotoIndex = (currentPhotoIndex - 1 + currentPhotos.length) % currentPhotos.length;
+      renderLightboxPhoto();
+    };
+
+    // Next Photo
+    window.nextLightboxPhoto = function() {
+      if (!currentPhotos || currentPhotos.length === 0) return;
+      currentPhotoIndex = (currentPhotoIndex + 1) % currentPhotos.length;
+      renderLightboxPhoto();
+    };
+
+    // Backdrop click to close
+    window.handleLightboxBackdrop = function(e) {
+      if (e.target.id === "fb-lightbox" || e.target.classList.contains("fb-lightbox-stage")) {
+        closeEventLightbox();
+      }
+    };
+
+    // Updates image and counter
+    function renderLightboxPhoto() {
+      const img = document.getElementById("fb-lightbox-img");
+      const counter = document.getElementById("fb-lightbox-counter");
+      if (!currentPhotos || currentPhotos.length === 0) return;
+      img.src = currentPhotos[currentPhotoIndex];
+      counter.textContent = `Photo ${currentPhotoIndex + 1} of ${currentPhotos.length}`;
+
+      // Update active thumbnail
+      const thumbs = document.querySelectorAll(".fb-lightbox-thumb");
+      thumbs.forEach((t, i) => {
+        t.classList.toggle("active", i === currentPhotoIndex);
+        if (i === currentPhotoIndex) {
+          t.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        }
+      });
+    }
+
+    // Renders the bottom thumbnail strip
+    function renderLightboxThumbs() {
+      const container = document.getElementById("fb-lightbox-thumbs");
+      if (!currentPhotos) return;
+      container.innerHTML = currentPhotos.map((src, idx) => `
+        <div class="fb-lightbox-thumb ${idx === currentPhotoIndex ? 'active' : ''}" onclick="selectLightboxPhoto(${idx})">
+          <img src="${src}" alt="Thumbnail ${idx + 1}" onerror="this.src='assets/logo.png'">
+        </div>
+      `).join("");
+    }
+
+    window.selectLightboxPhoto = function(idx) {
+      currentPhotoIndex = idx;
+      renderLightboxPhoto();
+    };
+
+    // Keyboard navigation: Left, Right, Escape
+    document.addEventListener("keydown", (e) => {
+      const lightbox = document.getElementById("fb-lightbox");
+      if (!lightbox.classList.contains("active")) return;
+      if (e.key === "ArrowLeft") prevLightboxPhoto();
+      if (e.key === "ArrowRight") nextLightboxPhoto();
+      if (e.key === "Escape") closeEventLightbox();
+    });
+
+    // ── Load dynamic posts from Supabase ────────────────────────────────────
+    async function loadFeaturedPosts() {
+      const feed = document.getElementById("fb-posts-feed");
+      if (!feed || !window.supabaseClient) return;
+
+      try {
+        const { data: posts, error } = await window.supabaseClient
+          .from("posts")
+          .select("*")
+          .eq("is_published", true)
+          .order("created_at", { ascending: false });
+
+        if (error || !posts || posts.length === 0) {
+          return; // Keep default fallback card
+        }
+
+        const postsWithImages = posts.filter(p => {
+          if (Array.isArray(p.images) && p.images.length > 0) return true;
+          if (typeof p.images === 'string' && p.images.trim().startsWith('[')) {
+            try { return JSON.parse(p.images).length > 0; } catch(e) {}
+          }
+          return !!(p.image_url && p.image_url.trim());
+        });
+
+        if (postsWithImages.length === 0) return;
+
+        feed.innerHTML = postsWithImages.map(post => {
+          let imgs = [];
+          if (Array.isArray(post.images)) imgs = post.images;
+          else if (typeof post.images === 'string' && post.images.trim().startsWith('[')) {
+            try { imgs = JSON.parse(post.images); } catch(e) {}
+          } else if (post.image_url) {
+            imgs = [post.image_url];
+          }
+
+          postsPhotoMap[post.id] = imgs;
+
+          const dateFormatted = post.created_at ? new Date(post.created_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
+          }) : 'Recent';
+
+          const paragraphs = (post.caption || post.description || '').split('\n').filter(Boolean);
+          const captionHtml = paragraphs.length > 0 
+            ? paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')
+            : '';
+
+          const totalImgs = imgs.length;
+          let gridHtml = '';
+
+          if (totalImgs === 1) {
+            gridHtml = `
+              <div class="fb-photo-grid" style="grid-template-columns: 1fr; grid-template-rows: 380px;">
+                <div class="fb-photo-tile" onclick="openEventLightbox(0, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[0]}" alt="${escapeHtml(post.title)}" onerror="this.src='assets/logo.png'">
+                </div>
+              </div>
+            `;
+          } else if (totalImgs === 2) {
+            gridHtml = `
+              <div class="fb-photo-grid" style="grid-template-columns: 1fr 1fr; grid-template-rows: 280px;">
+                <div class="fb-photo-tile" onclick="openEventLightbox(0, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[0]}" alt="${escapeHtml(post.title)} 1" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(1, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[1]}" alt="${escapeHtml(post.title)} 2" onerror="this.src='assets/logo.png'">
+                </div>
+              </div>
+            `;
+          } else if (totalImgs === 3) {
+            gridHtml = `
+              <div class="fb-photo-grid" style="grid-template-columns: 2fr 1fr; grid-template-rows: 140px 140px;">
+                <div class="fb-photo-tile" style="grid-row: span 2;" onclick="openEventLightbox(0, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[0]}" alt="${escapeHtml(post.title)} 1" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(1, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[1]}" alt="${escapeHtml(post.title)} 2" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(2, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[2]}" alt="${escapeHtml(post.title)} 3" onerror="this.src='assets/logo.png'">
+                </div>
+              </div>
+            `;
+          } else if (totalImgs >= 4) {
+            const more = totalImgs - 4;
+            gridHtml = `
+              <div class="fb-photo-grid">
+                <div class="fb-photo-tile" onclick="openEventLightbox(0, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[0]}" alt="${escapeHtml(post.title)} 1" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(1, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[1]}" alt="${escapeHtml(post.title)} 2" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(2, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[2]}" alt="${escapeHtml(post.title)} 3" onerror="this.src='assets/logo.png'">
+                </div>
+                <div class="fb-photo-tile" onclick="openEventLightbox(3, '${post.id}', '${escapeHtml(post.title)}')">
+                  <img src="${imgs[3]}" alt="${escapeHtml(post.title)} 4" onerror="this.src='assets/logo.png'">
+                  ${more > 0 ? `<div class="fb-photo-overlay">+${more} more</div>` : ''}
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="fb-post-card">
+              <div class="fb-post-header">
+                <img src="assets/logo.png" alt="Unit Avatar" class="fb-post-avatar" onerror="this.src='assets/icon.png'">
+                <div class="fb-post-meta">
+                  <div class="fb-post-author">
+                    San Enrique ROTC Unit
+                    <i class="fa-solid fa-circle-check verified-badge" title="Official Verified Unit"></i>
+                  </div>
+                  <div class="fb-post-sub">
+                    <span><i class="fa-regular fa-calendar"></i> ${escapeHtml(post.album_name || post.title)} &bull; ${dateFormatted}</span>
+                    <span>&bull;</span>
+                    <span><i class="fa-solid fa-globe"></i> Public</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fb-post-body">
+                <div class="fb-post-headline">
+                  ${escapeHtml(post.title)} 🫡🇵🇭
+                </div>
+                <div class="fb-post-caption">
+                  ${captionHtml}
+                </div>
+                <div class="fb-post-signoff">
+                  With honor and discipline, Your San Enrique ROTC Family 🎖️
+                </div>
+              </div>
+
+              ${gridHtml}
+
+              <div class="fb-post-footer">
+                <button class="fb-view-all-btn" onclick="openEventLightbox(0, '${post.id}', '${escapeHtml(post.title)}')">
+                  <i class="fa-solid fa-images"></i> View All ${totalImgs} Photos
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.warn('loadFeaturedPosts error:', err);
+      }
+    }
+
+    // ── Supabase Events Calendar Loader ─────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1. Load featured Facebook-style activity posts
+      loadFeaturedPosts();
+
+      // 2. Load upcoming training calendar
+      const container = document.getElementById("events-container");
+
+      try {
+        let allEvents = [];
+
+        if (window.supabaseClient) {
+          const { data: events, error } = await window.supabaseClient
+            .from("events")
+            .select("*")
+            .eq("is_published", true)
+            .order("created_at", { ascending: false });
+
+          if (!error && Array.isArray(events)) {
+            allEvents = allEvents.concat(events);
+          }
+
+          // Also fetch from posts table where category = 'events'
+          const { data: eventPosts, error: pErr } = await window.supabaseClient
+            .from("posts")
+            .select("*")
+            .eq("category", "events")
+            .eq("is_published", true)
+            .order("created_at", { ascending: false });
+
+          if (!pErr && Array.isArray(eventPosts)) {
+            eventPosts.forEach(ep => {
+              // Avoid duplicates if already in events table
+              if (!allEvents.some(e => e.title === ep.title && e.event_date === ep.event_date)) {
+                let img = null;
+                if (Array.isArray(ep.images) && ep.images.length > 0) img = ep.images[0];
+                else if (typeof ep.images === 'string') {
+                  try { const arr = JSON.parse(ep.images); img = arr[0]; } catch(e) { img = ep.images; }
+                }
+
+                allEvents.push({
+                  id: ep.id,
+                  title: ep.title,
+                  description: ep.caption,
+                  event_date: ep.event_date || ep.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+                  location: ep.location || 'San Enrique Grandstand Parade Grounds',
+                  uniform_info: ep.uniform_info || 'Type B Field Uniform',
+                  image_url: img,
+                  start_time: '07:00:00',
+                  end_time: '12:00:00'
+                });
+              }
+            });
+          }
+        }
+
+        // Sort by event date descending
+        allEvents.sort((a, b) => new Date(b.event_date) - new Date(a.event_date));
+        if (allEvents.length > 0) {
+          container.innerHTML = allEvents.map(e => renderEventCard(e)).join('');
+        } else {
+          // No published events in DB — show empty state (no mock fallback)
+          container.innerHTML = `
+            <div style="text-align:center; padding:3rem 1rem; color:#94a3b8;">
+              <i class="fa-solid fa-calendar-xmark" style="font-size:2.5rem; color:var(--brass,#b88e2c); display:block; margin-bottom:0.75rem;"></i>
+              <div style="font-size:1rem; font-weight:600; color:#374151;">No Upcoming Events</div>
+              <div style="font-size:0.85rem; margin-top:0.4rem;">Check back soon for scheduled ROTC drills and activities.</div>
+            </div>`;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    function renderEventCard(e) {
+      const dateFormatted = new Date(e.event_date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+
+      return `
+        <div class="card" style="padding: 0; overflow: hidden; border-radius: 14px; border: 1.5px solid #e5e7eb; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+          ${e.image_url ? `
+            <div style="width: 100%; height: 220px; background: #000; overflow: hidden;">
+              <img src="${e.image_url}" alt="${e.title}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.style.display='none'">
+            </div>
+          ` : ''}
+          <div style="padding: 1.5rem; display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center;">
+            <div style="background: linear-gradient(135deg, #0f2015, #1e3a29); border: 2px solid var(--brass); border-radius: 12px; padding: 1rem 1.25rem; text-align: center; min-width: 110px; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15); flex-shrink: 0;">
+              <div style="font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--brass-light); letter-spacing: 0.08em;">Formation</div>
+              <div style="font-family: 'Oswald', sans-serif; font-size: 1.65rem; font-weight: 700; color: #fff; line-height: 1.1; margin: 0.25rem 0;">${new Date(e.event_date).getDate()}</div>
+              <div style="font-size: 0.75rem; color: var(--brass-light); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                ${new Date(e.event_date).toLocaleString('en-US', { month: 'short' })}
+              </div>
+            </div>
+
+            <div style="flex: 1; min-width: 250px;">
+              <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.4rem;">
+                <span class="badge badge-admin" style="font-size: 0.72rem;">Formation Drill</span>
+                <span style="font-size: 0.72rem; color: var(--slate); font-weight: 600;">${dateFormatted}</span>
+              </div>
+              <h3 style="font-family: 'Oswald', sans-serif; font-size: 1.25rem; color: var(--ink); margin-bottom: 0.35rem; letter-spacing: 0.02em;">${e.title}</h3>
+              <p style="font-size: 0.88rem; color: var(--slate); line-height: 1.55;">${e.description}</p>
+
+              <div style="display: flex; gap: 1.25rem; flex-wrap: wrap; margin-top: 0.85rem; font-size: 0.8rem; color: var(--slate);">
+                ${e.location ? `<div><i class="fa-solid fa-location-dot" style="color: var(--brass); margin-right: 0.35rem;"></i><strong>Location:</strong> ${e.location}</div>` : ''}
+                <div><i class="fa-regular fa-clock" style="color: var(--brass); margin-right: 0.35rem;"></i><strong>Time:</strong> ${e.start_time ? e.start_time.substring(0, 5) : '0700H'} - ${e.end_time ? e.end_time.substring(0, 5) : '1200H'}</div>
+                ${e.uniform_info ? `<div><i class="fa-solid fa-shirt" style="color: var(--brass); margin-right: 0.35rem;"></i><strong>Uniform:</strong> ${e.uniform_info}</div>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  </script>
+
+  <!-- Navigation scripts -->
+  <script src="js/nav.js"></script>
+</body>
+</html>

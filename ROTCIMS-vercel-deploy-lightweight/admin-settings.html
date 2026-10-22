@@ -1,0 +1,308 @@
+<!--
+  ============================================================
+  FILE: admin-settings.html
+  PURPOSE: Unit profile and system configuration page.
+           The administrator can update six key-value settings
+           that control the ROTCIMS unit identity, contact
+           details, drill schedule notice, and the Android APK
+           download link. All settings are stored in the
+           'site_settings' table as key→value pairs.
+
+  ACCESS: STRICTLY restricted to 'admin' role only.
+          Auth.requireAuth(["admin"]) enforces this.
+          Personnel and platoon_leader cannot change settings.
+
+  SUPABASE TABLES USED:
+    READ   → site_settings  (SELECT key, value — all rows)
+    UPSERT → site_settings  (save all six settings at once;
+                              onConflict on 'key' to update existing)
+
+  SETTINGS KEYS:
+    organization_name     — unit name / designation
+    office_location       — headquarters physical location
+    contact_email         — official unit email address
+    contact_phone         — hotline / contact number
+    drill_schedule_info   — text description of standard drill schedule
+    apk_download_url      — path or URL to the Android APK file
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js, js/auth.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Settings — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+            <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html" ><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html" ><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html" ><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+          <li><a href="admin-reports.html" ><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html" ><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+          <li><a href="admin-applications.html" ><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+          <li><a href="admin-personnel.html" ><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html" ><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+          <li><a href="admin-documents.html" ><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html" ><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html" class="active"><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+        </ul>
+
+        <div class="nav-group-title">Public Front</div>
+        <ul class="sidebar-menu">
+          <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>System Settings &amp; Unit Configuration</h1>
+            <p>Institutional branding, contact points, drill notices, and mobile distribution.</p>
+          </div>
+        </div>
+
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">ST</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <div class="role-tag" id="user-role">Administrator</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <!-- max-width: 800px keeps the single-column form readable on wide screens -->
+      <div class="content-body" style="max-width: 800px;">
+        
+        <!-- ====== SAVE SUCCESS ALERT ====== -->
+        <!-- Hidden by default; shown for 3 seconds after a successful save -->
+        <div id="settings-alert" class="alert alert-success" style="display: none;"></div>
+
+        <!-- ====== SETTINGS FORM CARD ====== -->
+        <div class="card" style="padding: 2rem;">
+          <!-- handleSaveSettings() is called on form submit — prevents page reload -->
+          <form id="form-settings" onsubmit="handleSaveSettings(event)">
+
+            <!-- ====== SECTION 1: ORGANISATION IDENTITY ====== -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-bottom: 1.25rem;">
+              1. Organization Identity
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <!-- Maps to site_settings key: "organization_name" -->
+                <label class="form-label" for="set-org-name">Unit Name / Designation *</label>
+                <input type="text" id="set-org-name" required class="form-input">
+              </div>
+
+              <div class="form-group">
+                <!-- Maps to site_settings key: "office_location" -->
+                <label class="form-label" for="set-office">Headquarters Location</label>
+                <input type="text" id="set-office" class="form-input">
+              </div>
+            </div>
+
+            <!-- ====== SECTION 2: CONTACT & COMMUNICATIONS ====== -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1.25rem;">
+              2. Contact &amp; Communications
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <!-- Maps to site_settings key: "contact_email" -->
+                <label class="form-label" for="set-email">Official Unit Email *</label>
+                <input type="email" id="set-email" required class="form-input">
+              </div>
+
+              <div class="form-group">
+                <!-- Maps to site_settings key: "contact_phone" -->
+                <label class="form-label" for="set-phone">Hotline / Contact Number</label>
+                <input type="text" id="set-phone" class="form-input">
+              </div>
+            </div>
+
+            <!-- ====== SECTION 3: DRILL FORMATION & MOBILE APPLICATION ====== -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1.25rem;">
+              3. Drill Formation &amp; Mobile Application
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <!-- Maps to site_settings key: "drill_schedule_info"
+                     Displayed on the cadet portal's home page -->
+                <label class="form-label" for="set-schedule">Standard Drill Schedule</label>
+                <input type="text" id="set-schedule" class="form-input">
+              </div>
+
+              <div class="form-group">
+                <!-- Maps to site_settings key: "apk_download_url"
+                     The cadet portal links to this URL for the Android app download.
+                     Can be a relative path (e.g. downloads/app.apk) or a full URL. -->
+                <label class="form-label" for="set-apk">Android APK Download Link</label>
+                <input type="text" id="set-apk" class="form-input">
+              </div>
+            </div>
+
+            <!-- Save button aligned to the right -->
+            <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+              <!-- #btn-save-settings is disabled during the save to prevent double-submit -->
+              <button type="submit" id="btn-save-settings" class="btn btn-primary" style="padding: 0.75rem 1.75rem;">
+                💾 Save Configuration
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== PAGE LOGIC SCRIPT ====== -->
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD (ADMIN-ONLY) ──────────────────────────────────────
+      // System settings are high-impact — only the admin role may modify them.
+      // Personnel would see the form but cannot save; redirect is cleaner.
+      const officer = await Auth.requireAuth(["admin"]);
+      if (!officer) return;
+
+      await loadSettings();
+    });
+
+    // ── loadSettings() ────────────────────────────────────────────────────
+    // Fetches all key→value rows from site_settings and fills the form fields.
+    // A 'map' object is pre-populated with default values so the form is always
+    // usable even if the site_settings table is empty (fresh install).
+    async function loadSettings() {
+      const { data, error } = await window.supabaseClient.from("site_settings").select("key, value");
+
+      // Defaults for a fresh installation — these appear in the form
+      // if no site_settings rows exist yet.
+      const map = {
+        organization_name: "SAN ENRIQUE ROTC",
+        office_location: "San Enrique Campus Headquarters",
+        contact_email: "rotc@sanenrique.edu.ph",
+        contact_phone: "+63 900 000 0000",
+        drill_schedule_info: "Saturday &amp; Sunday 0700H - 1200H",
+        apk_download_url: "downloads/san-enrique-rotc.apk"
+      };
+
+      // Overwrite defaults with actual values from the DB (if they exist)
+      if (!error && data) {
+        data.forEach(r => { map[r.key] = r.value; });
+      }
+
+      // Populate each form field with the resolved value
+      document.getElementById("set-org-name").value = map.organization_name || "";
+      document.getElementById("set-office").value = map.office_location || "";
+      document.getElementById("set-email").value = map.contact_email || "";
+      document.getElementById("set-phone").value = map.contact_phone || "";
+      document.getElementById("set-schedule").value = map.drill_schedule_info || "";
+      document.getElementById("set-apk").value = map.apk_download_url || "";
+    }
+
+    // ── handleSaveSettings(e) ─────────────────────────────────────────────
+    // Reads all six form fields into an array of {key, value} objects and
+    // UPSERTs them all into site_settings in a single call.
+    // UPSERT with the 'key' conflict ensures that existing rows are UPDATED
+    // and missing rows are INSERTED — so this function works on both a
+    // fresh install and an existing configuration.
+    async function handleSaveSettings(e) {
+      e.preventDefault(); // prevent default HTML form submit
+      const btn = document.getElementById("btn-save-settings");
+      btn.disabled = true;     // prevent double-save during network call
+      btn.textContent = "Saving...";
+
+      // Build an array of key→value pairs that match the site_settings table schema
+      const updates = [
+        { key: "organization_name",   value: document.getElementById("set-org-name").value.trim() },
+        { key: "office_location",     value: document.getElementById("set-office").value.trim() },
+        { key: "contact_email",       value: document.getElementById("set-email").value.trim() },
+        { key: "contact_phone",       value: document.getElementById("set-phone").value.trim() },
+        { key: "drill_schedule_info", value: document.getElementById("set-schedule").value.trim() },
+        { key: "apk_download_url",    value: document.getElementById("set-apk").value.trim() },
+      ];
+
+      try {
+        // UPSERT the entire array in one round-trip.
+        // The 'key' column must be the PRIMARY KEY or have a UNIQUE constraint
+        // in site_settings for the onConflict behaviour to work correctly.
+        const { error } = await window.supabaseClient.from("site_settings").upsert(updates);
+        if (error) throw error;
+
+        // Show a temporary success banner
+        const alertBox = document.getElementById("settings-alert");
+        alertBox.textContent = "System settings updated successfully.";
+        alertBox.style.display = "flex";
+        setTimeout(() => { alertBox.style.display = "none"; }, 3000); // hide after 3s
+      } catch (err) {
+        alert("Save error: " + err.message);
+      } finally {
+        // Re-enable the save button whether success or failure
+        btn.disabled = false;
+        btn.textContent = "💾 Save Configuration";
+      }
+    }
+  </script>
+</body>
+</html>

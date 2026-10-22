@@ -1,0 +1,458 @@
+<!--
+  ============================================================
+  FILE: admin-applications.html
+  PURPOSE: Pending cadet registration review queue.
+           Displays all cadet accounts with status 'pending',
+           'under_review', or 'rejected' so officers can
+           approve or formally reject each application.
+           Approved cadets gain full portal access; rejected
+           ones are marked and excluded from QR scanning.
+
+  ACCESS: Restricted to 'admin', 'personnel', or
+          'platoon_leader'. Auth.requireAuth() enforces this.
+
+  SUPABASE TABLES USED:
+    READ   → profiles  (SELECT *, WHERE role='cadet'
+                        AND status IN ('pending','under_review','rejected'))
+    UPDATE → profiles  (SET status = 'approved' | 'rejected')
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js, js/auth.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadet Applications — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+            <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html" ><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html" ><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html" ><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+          <li><a href="admin-reports.html" ><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html" ><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+          <li><a href="admin-applications.html" class="active"><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+          <li><a href="admin-personnel.html" ><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html" ><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+          <li><a href="admin-documents.html" ><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html" ><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html" ><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+        </ul>
+
+        <div class="nav-group-title">Public Front</div>
+        <ul class="sidebar-menu">
+          <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>Cadet Enlistment Applications</h1>
+            <p>Review, verify, and approve incoming cadet registrations.</p>
+          </div>
+        </div>
+
+        <!-- Logged-in officer badge -->
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">AP</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <div class="role-tag" id="user-role">Officer</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <div class="content-body">
+
+        <!-- ====== MOBILE TACTICAL HUD CONTROLS (Handheld Terminal Only) ====== -->
+        <!-- Horizontally scrollable pill filters with live counts -->
+        <div class="mobile-pill-filters">
+          <div class="pill-filter-item active" id="pill-filter-all" onclick="setAppFilter('all')">
+            <span>All</span> (<span id="pill-count-all">0</span>)
+          </div>
+          <div class="pill-filter-item pending" id="pill-filter-pending" onclick="setAppFilter('pending')">
+            <span>Pending</span> (<span id="pill-count-pending">0</span>)
+          </div>
+          <div class="pill-filter-item approved" id="pill-filter-approved" onclick="setAppFilter('approved')">
+            <span>Approved</span> (<span id="pill-count-approved">0</span>)
+          </div>
+          <div class="pill-filter-item rejected" id="pill-filter-rejected" onclick="setAppFilter('rejected')">
+            <span>Rejected</span> (<span id="pill-count-rejected">0</span>)
+          </div>
+        </div>
+
+        <!-- Dedicated mobile search bar with gold icon -->
+        <div class="mobile-search-wrap">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="app-search-mobile" class="mobile-search-input" placeholder="Search by name, student ID, course..." oninput="filterAndRender()">
+        </div>
+
+        <!-- ====== DESKTOP & MOBILE APPLICATIONS CONTAINER ====== -->
+        <div class="card">
+          <div class="card-header">
+            <h3 id="queue-heading">Enlistment Applications Queue</h3>
+            <span id="app-count" class="badge badge-pending">0 Applications</span>
+          </div>
+
+          <!-- DESKTOP TABLE VIEW (Full columns for Command Monitors) -->
+          <div class="desktop-table-view table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Applicant Name</th>      <!-- last_name, first_name, middle_name -->
+                  <th>Student ID</th>           <!-- profiles.student_id -->
+                  <th>Course &amp; Year</th>    <!-- profiles.course + year_level -->
+                  <th>Contact Info</th>         <!-- email + phone -->
+                  <th>Date Registered</th>      <!-- profiles.created_at formatted -->
+                  <th>Current Status</th>       <!-- pending / approved / rejected pill -->
+                  <th style="text-align: right;">Review Action</th> <!-- Approve / Reject buttons -->
+                </tr>
+              </thead>
+              <tbody id="app-tbody">
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 2rem; color: var(--slate);">Loading applications...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- MOBILE CARDS VIEW (Tactile handheld cards matching mobile HUD) -->
+          <div class="mobile-cards-view" id="app-mobile-cards">
+            <div style="text-align: center; padding: 2rem; color: #94a3b8;">Loading cadet cards...</div>
+          </div>
+        </div>
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== PAGE LOGIC SCRIPT ====== -->
+  <script>
+    // Full cached list of cadet profiles from Supabase
+    let allCadets = [];
+    let currentFilter = 'all'; // 'all' | 'pending' | 'approved' | 'rejected'
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD ──────────────────────────────────────────────────
+      const officer = await Auth.requireAuth(["admin", "personnel", "platoon_leader"]);
+      if (!officer) return;
+
+      await loadApplications();
+    });
+
+    // ── loadApplications() ───────────────────────────────────────────────
+    // Loads all cadet applicants ordered newest-first
+    async function loadApplications() {
+      const { data, error } = await window.supabaseClient
+        .from("profiles")
+        .select("*")
+        .eq("role", "cadet")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        if (window.showMobileToast) window.showMobileToast("Failed to load: " + error.message, "error");
+        else alert("Failed to load applications: " + error.message);
+        return;
+      }
+
+      allCadets = data || [];
+      updatePillCounts();
+      filterAndRender();
+    }
+
+    // ── updatePillCounts() ───────────────────────────────────────────────
+    function updatePillCounts() {
+      const total = allCadets.length;
+      const pending = allCadets.filter(c => c.status === 'pending' || c.status === 'under_review').length;
+      const approved = allCadets.filter(c => c.status === 'approved').length;
+      const rejected = allCadets.filter(c => c.status === 'rejected').length;
+
+      document.getElementById("pill-count-all").textContent = total;
+      document.getElementById("pill-count-pending").textContent = pending;
+      document.getElementById("pill-count-approved").textContent = approved;
+      document.getElementById("pill-count-rejected").textContent = rejected;
+    }
+
+    // ── setAppFilter(status) ─────────────────────────────────────────────
+    function setAppFilter(status) {
+      currentFilter = status;
+      document.querySelectorAll(".mobile-pill-filters .pill-filter-item").forEach(el => el.classList.remove("active"));
+      const targetPill = document.getElementById("pill-filter-" + status);
+      if (targetPill) targetPill.classList.add("active");
+      filterAndRender();
+    }
+
+    // ── filterAndRender() ────────────────────────────────────────────────
+    function filterAndRender() {
+      const query = (document.getElementById("app-search-mobile")?.value || "").toLowerCase().trim();
+
+      let list = allCadets;
+
+      // Filter by status tab
+      if (currentFilter === 'pending') {
+        list = list.filter(c => c.status === 'pending' || c.status === 'under_review');
+      } else if (currentFilter === 'approved') {
+        list = list.filter(c => c.status === 'approved');
+      } else if (currentFilter === 'rejected') {
+        list = list.filter(c => c.status === 'rejected');
+      }
+
+      // Filter by search query
+      if (query) {
+        list = list.filter(c => {
+          const fullName = `${c.first_name || ''} ${c.middle_name || ''} ${c.last_name || ''}`.toLowerCase();
+          const studentId = (c.student_id || '').toLowerCase();
+          const course = (c.course || '').toLowerCase();
+          const section = (c.section || '').toLowerCase();
+          return fullName.includes(query) || studentId.includes(query) || course.includes(query) || section.includes(query);
+        });
+      }
+
+      // Update badge count
+      document.getElementById("app-count").textContent = `${list.length} Records`;
+
+      renderDesktopTable(list);
+      renderMobileCards(list);
+    }
+
+    // ── renderDesktopTable(list) ─────────────────────────────────────────
+    function renderDesktopTable(list) {
+      const tbody = document.getElementById("app-tbody");
+      if (!tbody) return;
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 3rem; color: var(--slate);">No applications matching current filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(a => `
+        <tr>
+          <td>
+            <strong>${a.last_name}, ${a.first_name} ${a.middle_name || ''}</strong>
+            <div style="font-size: 0.75rem; color: var(--slate);">${a.address || 'Address not listed'}</div>
+          </td>
+          <td style="font-family: monospace;">${a.student_id || 'N/A'}</td>
+          <td>${a.course || 'ROTC'} (${a.year_level || '1st Yr'})</td>
+          <td style="font-size: 0.8rem;">
+            <div>${a.email || 'No email'}</div>
+            <div style="color: var(--slate);">${a.phone || ''}</div>
+          </td>
+          <td style="font-size: 0.8rem;">${new Date(a.created_at).toLocaleDateString()}</td>
+          <td><span class="badge badge-${a.status}">${(a.status || 'pending').toUpperCase()}</span></td>
+          <td style="text-align: right;">
+            ${a.status !== 'approved' ? `
+              <button onclick="approveApplication('${a.id}', '${escapeQuotes(a.first_name + ' ' + a.last_name)}')" class="btn btn-brass btn-sm">Approve</button>
+            ` : `
+              <span style="font-size: 0.78rem; color: #16a34a; font-weight:700;"><i class="fa-solid fa-check"></i> Enrolled</span>
+            `}
+            ${a.status !== 'rejected' ? `
+              <button onclick="rejectApplication('${a.id}', '${escapeQuotes(a.first_name + ' ' + a.last_name)}')" class="btn btn-danger btn-sm" style="margin-left: 0.3rem;">Reject</button>
+            ` : ''}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // ── renderMobileCards(list) ──────────────────────────────────────────
+    function renderMobileCards(list) {
+      const container = document.getElementById("app-mobile-cards");
+      if (!container) return;
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8; font-size: 0.9rem;">
+            <i class="fa-solid fa-folder-open" style="font-size: 2rem; color: var(--brass, #b88e2c); margin-bottom: 0.5rem; display: block;"></i>
+            No cadet applications found for this filter.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = list.map(a => {
+        const initials = ((a.first_name?.[0] || '') + (a.last_name?.[0] || 'C')).toUpperCase();
+        const fullName = `${a.first_name || ''} ${a.last_name || ''}`.trim() || 'Cadet Applicant';
+        const studentId = a.student_id ? `ID: ${a.student_id}` : 'No Student ID';
+        const courseYear = `${a.course || 'ROTC'} ${a.year_level ? '• Yr ' + a.year_level : ''}`;
+        const section = a.section ? `Sec: ${a.section}` : (a.company || 'Alpha Co.');
+        const status = (a.status || 'pending').toLowerCase();
+
+        return `
+          <div class="mobile-cadet-card">
+            <div class="mobile-cadet-card-header">
+              <div class="mobile-cadet-avatar">${initials}</div>
+              <div class="mobile-cadet-info">
+                <div class="mobile-cadet-name">${fullName}</div>
+                <div class="mobile-cadet-meta">${studentId} • ${courseYear}</div>
+                <div class="mobile-cadet-section">${section}</div>
+              </div>
+              <div class="mobile-cadet-badges">
+                <span class="badge-touch-status ${status}">${status.toUpperCase()}</span>
+                <span class="badge-touch-drills">${a.company || 'Alpha'}</span>
+              </div>
+            </div>
+
+            <!-- Handheld Action Buttons -->
+            <div class="mobile-card-actions ${status === 'approved' ? 'single' : ''}">
+              ${status !== 'approved' ? `
+                <button type="button" class="btn-touch-approve" onclick="approveApplication('${a.id}', '${escapeQuotes(fullName)}')">
+                  <i class="fa-solid fa-check"></i> Approve
+                </button>
+              ` : `
+                <button type="button" class="btn-touch-view" style="width: 100%; justify-content: center;" onclick="window.showMobileToast('Cadet ${escapeQuotes(fullName)} is actively enrolled!', 'success')">
+                  <i class="fa-solid fa-shield-halved"></i> Active Cadet
+                </button>
+              `}
+              ${status !== 'rejected' ? `
+                <button type="button" class="btn-touch-reject" onclick="rejectApplication('${a.id}', '${escapeQuotes(fullName)}')">
+                  <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+              ` : `
+                <button type="button" class="btn-touch-approve" onclick="approveApplication('${a.id}', '${escapeQuotes(fullName)}')">
+                  <i class="fa-solid fa-rotate-left"></i> Re-Approve
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Helper for strings inside inline onclick
+    function escapeQuotes(str) {
+      return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    // ── approveApplication(id, name) ─────────────────────────────────────
+    async function approveApplication(id, name) {
+      if (!confirm(`Confirm approval for ${name}?`)) return;
+
+      const { error: profileErr } = await window.supabaseClient
+        .from("profiles")
+        .update({ status: "approved", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (profileErr) {
+        if (window.showMobileToast) window.showMobileToast("Approval failed: " + profileErr.message, "error");
+        else alert("Approval failed: " + profileErr.message);
+        return;
+      }
+
+      // Check / upsert row in cadets table to prevent attendance FK constraint violations
+      try {
+        const { data: existingCadet } = await window.supabaseClient
+          .from("cadets")
+          .select("id")
+          .eq("profile_id", id)
+          .maybeSingle();
+
+        if (!existingCadet) {
+          await window.supabaseClient
+            .from("cadets")
+            .insert({ profile_id: id, rotc_unit: "Alpha Company", rank: "Cadet" });
+        }
+      } catch (e) {
+        console.warn("Could not upsert into cadets table:", e);
+      }
+
+      // Update locally in cache
+      const item = allCadets.find(c => c.id === id);
+      if (item) item.status = "approved";
+
+      updatePillCounts();
+      filterAndRender();
+
+      if (window.showMobileToast) {
+        window.showMobileToast(`Cadet ${name} marked as APPROVED!`, "success");
+      }
+    }
+
+    // ── rejectApplication(id, name) ──────────────────────────────────────
+    async function rejectApplication(id, name) {
+      if (!confirm(`Confirm rejection for ${name}?`)) return;
+
+      const { error } = await window.supabaseClient
+        .from("profiles")
+        .update({ status: "rejected", updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (error) {
+        if (window.showMobileToast) window.showMobileToast("Rejection failed: " + error.message, "error");
+        else alert("Rejection failed: " + error.message);
+        return;
+      }
+
+      // Update locally in cache
+      const item = allCadets.find(c => c.id === id);
+      if (item) item.status = "rejected";
+
+      updatePillCounts();
+      filterAndRender();
+
+      if (window.showMobileToast) {
+        window.showMobileToast(`Cadet ${name} marked as REJECTED!`, "error");
+      }
+    }
+  </script>
+</body>
+</html>

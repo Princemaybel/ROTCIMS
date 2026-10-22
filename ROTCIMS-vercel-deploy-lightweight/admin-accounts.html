@@ -1,0 +1,337 @@
+see<!--
+  ============================================================
+  FILE: admin-accounts.html
+  PURPOSE: User account list with role management and
+           self-demotion protection. The system administrator
+           can:
+             • View ALL registered accounts across every role
+             • Search by name, student ID, or email
+             • Filter by role (admin/personnel/cadet) or status
+             • Change any user's role via an inline dropdown
+             • Approve pending accounts
+           SECURITY: The logged-in admin's own row has the
+           role-change dropdown DISABLED to prevent accidental
+           self-demotion (locking themselves out of the system).
+
+  ACCESS: STRICTLY restricted to 'admin' role only.
+          Auth.requireAuth(["admin"]) enforces this.
+          Personnel and platoon_leader cannot access this page.
+
+  SUPABASE TABLES USED:
+    READ   → profiles  (SELECT *, ORDER BY created_at DESC — all roles)
+    UPDATE → profiles  (SET role = newRole on inline dropdown change)
+    UPDATE → profiles  (SET status = 'approved' on Approve button click)
+
+  DEPENDENCIES:
+    css/style.css, css/responsive.css
+    js/config.js, js/auth.js
+  ============================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account &amp; Role Admin — ROTCIMS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Supabase client library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+
+  <!-- ====== PORTAL LAYOUT WRAPPER ====== -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Command Staff</span>
+          </div>
+        </div>
+      </div>
+
+            <nav class="sidebar-nav">
+        <div class="nav-group-title">Overview</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-dashboard.html" ><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+        </ul>
+
+        <div class="nav-group-title">Drill &amp; Attendance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-qr-scanner.html" ><i class="fa-solid fa-qrcode"></i> Live QR Scanner</a></li>
+          <li><a href="admin-attendance.html" ><i class="fa-solid fa-clipboard-check"></i> Attendance Records</a></li>
+          <li><a href="admin-reports.html" ><i class="fa-solid fa-file-invoice"></i> Attendance Reports</a></li>
+        </ul>
+
+        <div class="nav-group-title">Personnel &amp; Cadets</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-cadets.html" ><i class="fa-solid fa-users-viewfinder"></i> Cadet Directory</a></li>
+          <li><a href="admin-applications.html" ><i class="fa-solid fa-user-check"></i> Applications Review</a></li>
+          <li><a href="admin-personnel.html" ><i class="fa-solid fa-user-shield"></i> ROTC Personnel</a></li>
+        </ul>
+
+        <div class="nav-group-title">Content &amp; Documents</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-posting.html" ><i class="fa-solid fa-pen-to-square"></i> Posting Center</a></li>
+          <li><a href="admin-documents.html" ><i class="fa-solid fa-folder-open"></i> Documents Library</a></li>
+        </ul>
+
+        <div class="nav-group-title">System &amp; Governance</div>
+        <ul class="sidebar-menu">
+          <li><a href="admin-accounts.html" class="active"><i class="fa-solid fa-users-gear"></i> Account &amp; Role Admin</a></li>
+          <li><a href="admin-settings.html" ><i class="fa-solid fa-sliders"></i> System Settings</a></li>
+        </ul>
+
+        <div class="nav-group-title">Public Front</div>
+        <ul class="sidebar-menu">
+          <li><a href="index.html" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> View Website</a></li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span id="sidebar-role" style="font-size: 0.75rem; text-transform: uppercase; color: var(--portal-brass-light); font-weight: 700;">Command</span>
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>User Account &amp; Role Governance</h1>
+            <p>Assign military roles, elevate privileges, and approve pending registrations.</p>
+          </div>
+        </div>
+
+        <div class="user-badge">
+          <div class="avatar" id="user-avatar">SA</div>
+          <div class="user-info">
+            <div class="name" id="user-name">Loading...</div>
+            <!-- Role tag shows 'Administrator' since only admins reach this page -->
+            <div class="role-tag" id="user-role">Administrator</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== CONTENT BODY ====== -->
+      <div class="content-body">
+        
+        <!-- ====== FILTER BAR ====== -->
+        <!-- Three filters: text search, role filter, status filter.
+             All call renderTable() (client-side) on every change. -->
+        <div class="filter-bar">
+          <!-- Search matches name, email, OR student ID -->
+          <input type="text" id="acc-search" placeholder="Search by name, student ID, email..." class="form-input search-input" oninput="renderTable()">
+
+          <!-- Role filter — "personnel" also includes platoon_leader (see renderTable()) -->
+          <select id="acc-role-filter" class="form-select" style="max-width: 180px;" onchange="renderTable()">
+            <option value="all">All Roles</option>
+            <option value="admin">Administrator</option>
+            <option value="personnel">ROTC Personnel</option>
+            <option value="cadet">Cadet</option>
+          </select>
+
+          <!-- Account status filter -->
+          <select id="acc-status-filter" class="form-select" style="max-width: 160px;" onchange="renderTable()">
+            <option value="all">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="under_review">Under Review</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        <!-- ====== ACCOUNTS TABLE ====== -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Registered User Accounts</h3>
+            <!-- #acc-count badge shows number of rows after filtering -->
+            <span id="acc-count" class="badge badge-admin">0 Users</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>User / Name</th>     <!-- first_name + last_name + "YOU" badge if self -->
+                  <th>Student ID</th>      <!-- profiles.student_id (monospace) -->
+                  <th>Email</th>           <!-- profiles.email -->
+                  <th>Current Role</th>    <!-- profiles.role badge -->
+                  <th>Status</th>          <!-- profiles.status badge -->
+                  <!-- "Role Governance" column contains inline dropdown + optional Approve button -->
+                  <th style="text-align: right;">Role Governance</th>
+                </tr>
+              </thead>
+              <!-- #acc-tbody rows injected by renderTable() -->
+              <tbody id="acc-tbody">
+                <tr>
+                  <td colspan="6" style="text-align: center; padding: 2rem; color: var(--slate);">Loading accounts...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- end .content-body -->
+    </main>
+  </div><!-- end .portal-layout -->
+
+  <!-- ====== PAGE LOGIC SCRIPT ====== -->
+  <script>
+    // currentAdmin — the logged-in administrator's profile.
+    // Used to detect "self" rows and disable the role-change dropdown for them.
+    let currentAdmin = null;
+    // accountList — all profiles fetched from Supabase; filtering is client-side
+    let accountList = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      // ── SECURITY GUARD (ADMIN-ONLY) ──────────────────────────────────────
+      // This page requires the 'admin' role — personnel cannot manage roles.
+      // requireAuth(["admin"]) redirects anyone with a lower role to login.
+      currentAdmin = await Auth.requireAuth(["admin"]);
+      if (!currentAdmin) return;
+
+      await loadAccounts();
+    });
+
+    // ── loadAccounts() ────────────────────────────────────────────────────
+    // Fetches ALL profiles regardless of role (we need the full list here).
+    // Ordered by created_at DESC so newest registrations appear at the top.
+    async function loadAccounts() {
+      const { data, error } = await window.supabaseClient
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false }); // newest first
+
+      if (error) {
+        alert("Failed to load user accounts: " + error.message);
+        return;
+      }
+      accountList = data || [];
+      renderTable(); // render with default "all" filters
+    }
+
+    // ── renderTable() ────────────────────────────────────────────────────
+    // Applies search + role + status filters to accountList and re-renders
+    // the tbody. All filtering is client-side for speed.
+    function renderTable() {
+      const search = document.getElementById("acc-search").value.toLowerCase();
+      const role = document.getElementById("acc-role-filter").value;
+      const status = document.getElementById("acc-status-filter").value;
+
+      const filtered = accountList.filter(u => {
+        const fullName = `${u.first_name} ${u.last_name}`.toLowerCase();
+        const matchSearch = fullName.includes(search) || u.email.toLowerCase().includes(search) || u.student_id.toLowerCase().includes(search);
+        // "personnel" filter also catches platoon_leader accounts (same access tier)
+        const matchRole = role === "all" || u.role === role || (role === "personnel" && u.role === "platoon_leader");
+        const matchStatus = status === "all" || u.status === status;
+        return matchSearch && matchRole && matchStatus;
+      });
+
+      document.getElementById("acc-count").textContent = `${filtered.length} Users`;
+      const tbody = document.getElementById("acc-tbody");
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--slate);">No accounts match filters.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(u => {
+        // isSelf — true when this row represents the currently logged-in admin
+        const isSelf = u.id === currentAdmin.id;
+
+        return `
+          <tr>
+            <td>
+              <strong>${u.first_name} ${u.last_name}</strong>
+              <!-- "YOU" badge visually marks the admin's own row for clarity -->
+              ${isSelf ? '<span class="badge badge-admin" style="margin-left: 0.35rem; font-size: 0.65rem;">YOU</span>' : ''}
+            </td>
+            <td style="font-family: monospace;">${u.student_id}</td>
+            <td style="font-size: 0.82rem;">${u.email}</td>
+            <td>
+              <!-- Colour-coded role badge: badge-admin, badge-cadet, or badge-personnel -->
+              <span class="badge badge-${u.role === 'admin' ? 'admin' : u.role === 'cadet' ? 'cadet' : 'personnel'}">
+                ${u.role.toUpperCase()}
+              </span>
+            </td>
+            <td>
+              <!-- Status badge: badge-approved (green), badge-pending (yellow), etc. -->
+              <span class="badge badge-${u.status}">${u.status.toUpperCase()}</span>
+            </td>
+            <td style="text-align: right;">
+              <!-- Inline role-change dropdown.
+                   DISABLED for the admin's own row to prevent self-demotion.
+                   If disabled, the dropdown is greyed out and cannot be changed.
+                   onchange calls changeRole() which UPDATE the profiles.role column. -->
+              <select onchange="changeRole('${u.id}', this.value)" ${isSelf ? 'disabled' : ''} style="padding: 0.25rem 0.5rem; font-size: 0.78rem; border-radius: 4px; border: 1px solid var(--mist);">
+                <option value="cadet" ${u.role === 'cadet' ? 'selected' : ''}>Cadet</option>
+                <!-- platoon_leader is grouped under "ROTC Personnel" in this dropdown
+                     because they have the same page-access tier as 'personnel' -->
+                <option value="personnel" ${u.role === 'personnel' || u.role === 'platoon_leader' ? 'selected' : ''}>ROTC Personnel</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Administrator</option>
+              </select>
+
+              <!-- Approve button appears only for non-approved users.
+                   Clicking calls approveUser() which SET status = 'approved'. -->
+              ${u.status !== 'approved' ? `<button onclick="approveUser('${u.id}')" class="btn btn-brass btn-sm" style="margin-left: 0.35rem;">Approve</button>` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ── changeRole(profileId, newRole) ────────────────────────────────────
+    // UPDATEs profiles.role for the given user after admin confirmation.
+    // If the admin cancels the confirm dialog, loadAccounts() is called to
+    // reset the dropdown back to the original value (the <select> already
+    // changed visually before confirm was shown).
+    async function changeRole(profileId, newRole) {
+      if (!confirm(`Are you sure you want to change this user's role to ${newRole.toUpperCase()}?`)) {
+        // Reset the dropdown to the current DB value by reloading
+        await loadAccounts();
+        return;
+      }
+
+      const { error } = await window.supabaseClient
+        .from("profiles")
+        .update({ role: newRole, updated_at: new Date().toISOString() })
+        .eq("id", profileId); // only update the specific user's row
+
+      if (error) alert("Error changing role: " + error.message);
+      else {
+        alert("Role updated successfully.");
+        await loadAccounts(); // refresh to show the new role badge
+      }
+    }
+
+    // ── approveUser(profileId) ────────────────────────────────────────────
+    // Quickly approves a pending user without changing their role.
+    // No confirm dialog — the Approve button is explicit enough as intent.
+    async function approveUser(profileId) {
+      const { error } = await window.supabaseClient
+        .from("profiles")
+        .update({ status: "approved", updated_at: new Date().toISOString() })
+        .eq("id", profileId);
+
+      if (error) alert("Error approving user: " + error.message);
+      else await loadAccounts(); // refresh so the Approve button disappears
+    }
+  </script>
+</body>
+</html>

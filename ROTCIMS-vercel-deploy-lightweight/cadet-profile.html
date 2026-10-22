@@ -1,0 +1,405 @@
+<!--
+  =============================================================================
+  FILE: cadet-profile.html
+  PURPOSE: Allows a logged-in cadet to VIEW their official enlisted record and
+           EDIT a limited subset of personal contact information.
+
+  WHO USES THIS PAGE:
+    - Authenticated cadets with role = "cadet" and status = "approved".
+    - Unauthenticated users or users with a different role are redirected
+      to login.html by Auth.requireAuth() before anything renders.
+
+  WHAT CAN BE EDITED (cadet-editable fields):
+    - Mobile phone number
+    - Residential address
+    - Emergency contact name
+    - Emergency contact phone
+
+  WHAT CANNOT BE EDITED (read-only / locked fields):
+    - Full name       — must match official enlistment records
+    - Student ID      — immutable institutional identifier
+    - Course & Year   — academic record; changed by admin only
+    - Company/Platoon — military unit assignment; set by command staff only
+    - Email           — tied to the Supabase Auth account; changing it requires
+                        a separate email-change flow with re-verification
+    - Role & Status   — SECURITY: cadets MUST NOT be able to change their own
+                        role or approval status. These fields are not even
+                        present on this page. The DB update in handleSaveProfile()
+                        only touches the four allowed columns.
+
+  SECURITY NOTES:
+    - The .update() call only passes { phone, address, emergency_contact_name,
+      emergency_contact_phone } — no `role`, `status`, or `student_id` column.
+      Even if a malicious user edited the JS in DevTools, they could only
+      update those four columns because Supabase Row Level Security (RLS) should
+      also enforce which columns a cadet can write to.
+    - The .eq("id", currentCadet.id) ensures the update only affects the
+      currently authenticated cadet's own row, not any other cadet's record.
+
+  SUPABASE TABLES USED:
+    - profiles → SELECT (all fields, via Auth.requireAuth / Auth.getProfile)
+    - profiles → UPDATE (only phone, address, emergency_contact_name,
+                          emergency_contact_phone, updated_at)
+
+  SCRIPTS:
+    - js/config.js  → window.supabaseClient setup
+    - js/auth.js    → Auth.requireAuth(), Auth.logout()
+  =============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Profile — ROTCIMS</title>
+
+  <!-- Global ROTCIMS stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Portal visual upgrade: improved sidebar, cards, tables, inputs -->
+  <link rel="stylesheet" href="css/portal.css">
+  <!-- Responsive/mobile breakpoint overrides -->
+  <link rel="stylesheet" href="css/responsive.css">
+  <!-- Font Awesome 6: icons throughout the portal -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- ====== EXTERNAL DEPENDENCIES ====== -->
+  <!-- Supabase JS client v2 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Initialises window.supabaseClient -->
+  <script src="js/config.js"></script>
+  <!-- Auth helpers: requireAuth(), logout() -->
+  <script src="js/auth.js"></script>
+</head>
+
+<body>
+
+  <!-- ====== TWO-COLUMN PORTAL LAYOUT ====== -->
+  <!-- Same sidebar + main content structure used across all cadet pages.
+       CSS Grid defined in style.css; sidebar collapses on mobile. -->
+  <div class="portal-layout">
+
+    <!-- ====== SIDEBAR NAVIGATION ====== -->
+    <aside class="sidebar">
+
+      <!-- ====== SIDEBAR BRAND ====== -->
+      <div class="sidebar-header">
+        <div class="brand">
+          <!-- Logo with onerror fallback to icon.png -->
+          <img src="assets/logo.png" alt="Logo" onerror="this.src='assets/icon.png'">
+          <div class="brand-text">
+            ROTCIMS
+            <span>Cadet Portal</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== SIDEBAR MENU ====== -->
+      <nav class="sidebar-nav">
+        <div class="nav-group-title">My Information</div>
+        <ul class="sidebar-menu">
+          <li><a href="cadet-dashboard.html"><i class="fa-solid fa-id-card"></i> Digital ID &amp; QR</a></li>
+          <li><a href="cadet-modules.html"><i class="fa-solid fa-book-open"></i> Learning Modules</a></li>
+          <li><a href="cadet-profile.html" class="active"><i class="fa-solid fa-user-gear"></i> My Profile Details</a></li>
+          <li><a href="cadet-dashboard.html#attendance-history"><i class="fa-solid fa-clipboard-check"></i> Attendance History</a></li>
+        </ul>
+
+      </nav>
+
+      <!-- ====== SIDEBAR FOOTER ====== -->
+      <div class="sidebar-footer">
+        <!-- Static role label — cadets cannot change their own role -->
+        <span style="font-size: 0.75rem; text-transform: uppercase; color: var(--brass-light); font-weight: 700;">Cadet</span>
+        <!-- Auth.logout() signs the user out and redirects to login.html -->
+        <button onclick="Auth.logout()" class="btn-logout">Sign Out ➔</button>
+      </div>
+    </aside>
+
+    <!-- ====== MAIN CONTENT AREA ====== -->
+    <main class="main-content">
+
+      <!-- ====== TOP BAR / PAGE HEADER ====== -->
+      <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <!-- Hamburger for mobile sidebar toggle — handled by toggleMobileMenu() -->
+          <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+          <div class="page-title">
+            <h1>Cadet Profile &amp; Information</h1>
+            <p>View your enlisted records and update personal contact details.</p>
+          </div>
+        </div>
+
+        <!-- ====== USER AVATAR / BADGE ====== -->
+        <!-- Populated by JS after the profile is loaded -->
+        <div class="user-badge">
+          <!-- id="user-avatar": JS can write initials here (e.g. "JD") -->
+          <div class="avatar" id="user-avatar">CD</div>
+          <div class="user-info">
+            <!-- id="user-name": JS writes the cadet's full name -->
+            <div class="name" id="user-name">Loading...</div>
+            <!-- id="user-role": JS writes the role tag -->
+            <div class="role-tag" id="user-role">Cadet</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== PROFILE FORM AREA ====== -->
+      <!-- max-width: 800px keeps the two-column grid from stretching too wide
+           on large monitors, improving readability of form fields. -->
+      <div class="content-body" style="max-width: 800px;">
+
+        <!-- ====== SUCCESS / ERROR ALERT ====== -->
+        <!-- id="profile-alert": shown briefly after a successful save,
+             then hidden again after 3 seconds via setTimeout.
+             Uses alert-success styling (green). Hidden by default. -->
+        <div id="profile-alert" class="alert alert-success" style="display: none;"></div>
+
+        <!-- ====== PROFILE FORM CARD ====== -->
+        <div class="card" style="padding: 2rem;">
+
+          <!-- The form's onsubmit attribute calls handleSaveProfile(event) directly.
+               This is an alternative to adding an event listener in script — both
+               approaches are valid. event is passed so we can call e.preventDefault(). -->
+          <form id="form-cadet-profile" onsubmit="handleSaveProfile(event)">
+
+            <!-- ====== SECTION A: OFFICIAL / LOCKED ACADEMIC RECORD ====== -->
+            <!--
+              These fields are populated from the `profiles` table but are marked
+              `disabled` so the cadet cannot type in them. Disabled inputs:
+                • Are grayed out visually (background: var(--paper))
+                • Are NOT submitted with the form (browser ignores disabled fields)
+                • Cannot be focused or modified by keyboard
+              This provides a clear "read-only" UX without needing extra JavaScript.
+
+              SECURITY NOTE: Even though disabled fields are shown, the actual
+              .update() call in handleSaveProfile() does NOT include these field IDs
+              in the data object, so no accidental or malicious edit of these values
+              is possible through this page.
+            -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-bottom: 1.25rem;">
+              Academic &amp; Military Allocation (Official Record)
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div>
+                <label class="form-label">Full Name</label>
+                <!-- id="prof-fullname": JS writes "FirstName LastName" here.
+                     disabled prevents editing; grayed background signals read-only. -->
+                <input type="text" id="prof-fullname" disabled class="form-input" style="background: var(--paper); color: var(--slate);">
+              </div>
+              <div>
+                <label class="form-label">Student ID Number</label>
+                <!-- id="prof-studentid": monospace font makes the ID number easier to read.
+                     Disabled — student IDs are institutional records, not self-reported. -->
+                <input type="text" id="prof-studentid" disabled class="form-input" style="background: var(--paper); color: var(--slate); font-family: monospace;">
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+              <div>
+                <label class="form-label">Course &amp; Year Level</label>
+                <!-- id="prof-course": JS writes "BS IT (2nd Year)" here.
+                     Disabled — course changes must go through academic records office. -->
+                <input type="text" id="prof-course" disabled class="form-input" style="background: var(--paper); color: var(--slate);">
+              </div>
+              <div>
+                <label class="form-label">Assigned Unit (Company / Platoon)</label>
+                <!-- id="prof-unit": JS writes "Alpha • 1st Platoon" or "Unassigned Unit".
+                     Disabled — military unit assignments are set by command staff only. -->
+                <input type="text" id="prof-unit" disabled class="form-input" style="background: var(--paper); color: var(--slate);">
+              </div>
+            </div>
+
+            <!-- ====== SECTION B: EDITABLE PERSONAL CONTACT INFO ====== -->
+            <!--
+              These fields are active (NOT disabled) so the cadet can update them.
+              They are the only four columns written in the .update() call below.
+            -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-bottom: 1.25rem;">
+              Personal &amp; Contact Information (Editable)
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="prof-phone">Mobile Phone *</label>
+                <!-- id="prof-phone": required editable field. Value pre-filled by JS.
+                     type="tel" shows numeric keyboard on mobile. -->
+                <input type="tel" id="prof-phone" required class="form-input">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="prof-email">Institutional Email</label>
+                <!-- id="prof-email": DISABLED — email is the Supabase Auth identifier.
+                     Changing it requires the auth.updateUser() flow with email verification,
+                     which is handled separately (if at all). We show it for information only. -->
+                <input type="email" id="prof-email" disabled class="form-input" style="background: var(--paper); color: var(--slate);">
+              </div>
+            </div>
+
+            <!-- Full-width address field -->
+            <div class="form-group">
+              <label class="form-label" for="prof-address">Residential Address *</label>
+              <!-- id="prof-address": required editable field. Value pre-filled by JS. -->
+              <input type="text" id="prof-address" required class="form-input">
+            </div>
+
+            <!-- ====== SECTION C: EMERGENCY CONTACT ====== -->
+            <h3 style="font-size: 1.05rem; color: var(--primary); border-bottom: 1px solid var(--mist); padding-bottom: 0.5rem; margin-top: 1.5rem; margin-bottom: 1.25rem;">
+              Emergency Contact Information
+            </h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="prof-em-name">Emergency Contact Person</label>
+                <!-- id="prof-em-name": editable — not required because some cadets
+                     may not have an alternate contact readily available. -->
+                <input type="text" id="prof-em-name" class="form-input">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="prof-em-phone">Emergency Contact Phone</label>
+                <!-- id="prof-em-phone": editable — paired with the contact name above -->
+                <input type="tel" id="prof-em-phone" class="form-input">
+              </div>
+            </div>
+
+            <!-- ====== SAVE BUTTON ====== -->
+            <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+              <!-- id="btn-save-profile": JS grabs this to show a "Saving..." state
+                   and re-enable it after the Supabase update resolves. -->
+              <button type="submit" id="btn-save-profile" class="btn btn-primary" style="padding: 0.75rem 1.75rem;">
+                💾 Save Profile Changes
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ====== PAGE JAVASCRIPT ====== -->
+  <script>
+    /*
+     * currentCadet: module-level variable that holds the profile object returned
+     * by Auth.requireAuth(). It is declared outside DOMContentLoaded so that the
+     * handleSaveProfile() function (also declared at module scope) can access it
+     * when the form is submitted — without needing to re-query Supabase.
+     */
+    let currentCadet = null;
+
+    /*
+     * DOMContentLoaded: wait for full HTML parse, then load the profile and
+     * pre-fill all form fields. `async` is needed for `await Auth.requireAuth()`.
+     */
+    document.addEventListener("DOMContentLoaded", async () => {
+
+      // ====== AUTH GUARD ======
+      /*
+       * requireAuth(["cadet"]) verifies:
+       *   1. A valid Supabase session exists (user is logged in)
+       *   2. The profile's role is "cadet" (not admin or other)
+       * If either check fails, it redirects to login.html and returns null.
+       * The `if (!currentCadet) return` line halts execution to prevent errors
+       * on the DOM reads below (since the cadet was redirected away).
+       */
+      currentCadet = await Auth.requireAuth(["cadet"]);
+      if (!currentCadet) return;
+
+      // ====== PRE-FILL ALL FORM FIELDS FROM THE PROFILE ======
+      // Locked fields (disabled inputs) — displayed for reference only
+      document.getElementById("prof-fullname").value  = `${currentCadet.first_name} ${currentCadet.last_name}`;
+      document.getElementById("prof-studentid").value = currentCadet.student_id;
+      document.getElementById("prof-course").value    = `${currentCadet.course} (${currentCadet.year_level || ''})`;
+
+      // Build unit string: filter out null/empty values before joining
+      document.getElementById("prof-unit").value      = [currentCadet.company, currentCadet.platoon]
+        .filter(Boolean).join(" • ") || "Unassigned Unit";
+
+      // Email is shown but disabled — see security note in HTML above
+      document.getElementById("prof-email").value     = currentCadet.email;
+
+      // Editable fields — || "" ensures empty string rather than "null"/"undefined"
+      document.getElementById("prof-phone").value     = currentCadet.phone || "";
+      document.getElementById("prof-address").value   = currentCadet.address || "";
+      document.getElementById("prof-em-name").value   = currentCadet.emergency_contact_name || "";
+      document.getElementById("prof-em-phone").value  = currentCadet.emergency_contact_phone || "";
+    });
+
+    /*
+     * handleSaveProfile — called by the form's onsubmit attribute.
+     *
+     * Reads the four editable fields, builds a minimal update object,
+     * and calls supabase.from("profiles").update() targeted at the cadet's
+     * own row (filtered by .eq("id", currentCadet.id)).
+     *
+     * SECURITY NOTE: Only these four columns are included in the update payload:
+     *   phone, address, emergency_contact_name, emergency_contact_phone, updated_at
+     * Fields like `role`, `status`, `student_id`, `company`, `platoon` are NOT
+     * included — so even if the JS were modified in DevTools, those columns would
+     * remain unchanged. Supabase RLS policies should provide a second layer of
+     * protection to enforce this at the database level.
+     */
+    async function handleSaveProfile(e) {
+      // Prevent the form from submitting via HTTP and refreshing the page
+      e.preventDefault();
+
+      // Show a loading state to prevent double-clicks during the async call
+      const btn = document.getElementById("btn-save-profile");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      // Read current values from only the four editable fields
+      const phone                   = document.getElementById("prof-phone").value.trim();
+      const address                 = document.getElementById("prof-address").value.trim();
+      const emergency_contact_name  = document.getElementById("prof-em-name").value.trim();
+      const emergency_contact_phone = document.getElementById("prof-em-phone").value.trim();
+
+      try {
+        /*
+         * Supabase: update the `profiles` table.
+         *   - .update({...})  → the new column values (only the 4 allowed fields)
+         *   - .eq("id", currentCadet.id) → restricts to this cadet's own row ONLY.
+         *     Without this filter, the update could affect every row in the table
+         *     (if RLS is misconfigured). Always scope writes to the user's own ID.
+         *   - updated_at: new Date().toISOString() → records the timestamp of the
+         *     last profile edit, useful for audit logs and admin review.
+         *
+         * Destructuring `{ error }` from the response: if error is not null,
+         * we throw it to jump to the catch block below.
+         */
+        const { error } = await window.supabaseClient
+          .from("profiles")
+          .update({
+            phone,
+            address,
+            emergency_contact_name,
+            emergency_contact_phone,
+            updated_at: new Date().toISOString()  // ISO 8601 format required by PostgreSQL
+          })
+          .eq("id", currentCadet.id); // Scoped to this cadet's row
+
+        // If Supabase returned an error object, surface it as a thrown exception
+        if (error) throw error;
+
+        // ---- Success: show confirmation banner briefly ----
+        const alertBox = document.getElementById("profile-alert");
+        alertBox.textContent = "Profile details updated successfully.";
+        alertBox.style.display = "flex";
+        // Auto-hide the banner after 3 seconds — keeps the UI clean
+        setTimeout(() => { alertBox.style.display = "none"; }, 3000);
+
+      } catch (err) {
+        // Show a native alert for errors — simple and immediately visible.
+        // In a future version this could use the #profile-alert box with
+        // alert-error styling for a more consistent UI.
+        alert("Update error: " + err.message);
+      } finally {
+        // `finally` runs whether or not an error occurred — always re-enable
+        // the button and restore its label so the cadet can try again.
+        btn.disabled = false;
+        btn.textContent = "💾 Save Profile Changes";
+      }
+    }
+  </script>
+</body>
+</html>

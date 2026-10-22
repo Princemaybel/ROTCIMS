@@ -1,0 +1,1262 @@
+/* ==========================================================================
+   FILE: enhancements.css
+   PROJECT: ROTCIMS — San Enrique ROTC
+   PURPOSE: Visual upgrade layer — adds animations, glassmorphism, improved
+            hero section, stats strip, enhanced cards, and a rich footer.
+            Load AFTER style.css and responsive.css in every public page.
+   ========================================================================== */
+
+/* ── Google Fonts ──────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+/* Apply imported fonts to the whole page */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Oswald is used for headings — it has a strong military feel */
+h1, h2, h3, h4,
+.hero-title,
+.section-heading,
+.stat-number {
+  font-family: 'Oswald', sans-serif;
+}
+
+/* ── CSS Animations ─────────────────────────────────────────────────────── */
+
+/* Fade in while sliding up from 30px below */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fade in while sliding down from 20px above */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pulse glow animation for the hero badge */
+@keyframes pulseBrass {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(184, 142, 44, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(184, 142, 44, 0); }
+}
+
+/* Horizontal gradient animation for the hero line accent */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Subtle float animation for decorative elements */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+/* ── Enhanced Site Header (Glassmorphism) ────────────────────────────── */
+.site-header {
+  background: rgba(18, 36, 25, 0.97) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(184, 142, 44, 0.2);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ── HERO SECTION ───────────────────────────────────────────────────────── */
+.hero-section {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #060e09 0%, #0d1f15 35%, #122419 65%, #1a3022 100%);
+  padding: 6rem 1.5rem 4rem;
+}
+
+/* Military grid-line pattern overlay */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(184, 142, 44, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 142, 44, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+}
+
+/* Radial glow in the center of the hero */
+.hero-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(184, 142, 44, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Content wrapper — sits above the pseudo-element overlays */
+.hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  animation: fadeInUp 0.9s ease both;
+}
+
+/* Military-style badge above the main heading */
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(184, 142, 44, 0.12);
+  border: 1px solid rgba(184, 142, 44, 0.4);
+  color: #dfb54e;
+  padding: 0.45rem 1.1rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 1.75rem;
+  animation: pulseBrass 3s ease-in-out infinite;
+}
+
+/* Main hero heading */
+.hero-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(2.2rem, 6vw, 4rem);
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.15;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+  /* Gradient text effect on the ROTCIMS name */
+}
+
+/* The accent color word in the hero title */
+.hero-title .accent {
+  background: linear-gradient(135deg, #b88e2c, #dfb54e, #f0c96a);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* Subtitle paragraph */
+.hero-subtitle {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.75);
+  max-width: 650px;
+  margin: 0 auto 2.25rem;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+/* Hero CTA button row */
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 3rem;
+}
+
+/* Primary hero button */
+.btn-hero {
+  padding: 0.85rem 2rem;
+  font-size: 1rem;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+/* Outlined hero button */
+.btn-hero-outline {
+  padding: 0.85rem 2rem;
+  font-size: 1rem;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-hero-outline:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* ── STATS STRIP ─────────────────────────────────────────────────────────── */
+.stats-strip {
+  background: linear-gradient(135deg, #0d1f15, #1e3a29);
+  border-top: 1px solid rgba(184, 142, 44, 0.2);
+  border-bottom: 1px solid rgba(184, 142, 44, 0.2);
+  padding: 2.5rem 1.5rem;
+}
+
+.stats-strip-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;
+  text-align: center;
+}
+
+/* Individual stat box */
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Large animated number */
+.stat-number {
+  font-family: 'Oswald', sans-serif;
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: #dfb54e;
+  line-height: 1;
+}
+
+/* Small label below the number */
+.stat-label {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+/* Decorative icon above the number */
+.stat-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.8;
+}
+
+/* ── SECTION LAYOUT HELPERS ──────────────────────────────────────────────── */
+.section-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 5rem 1.5rem;
+}
+
+/* Small uppercase label above section headings */
+.section-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--brass);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 0.5rem;
+}
+
+/* Main section heading */
+.section-heading {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(1.6rem, 3vw, 2.5rem);
+  color: var(--ink);
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+
+/* Subtitle paragraph below section heading */
+.section-sub {
+  max-width: 580px;
+  margin: 0 auto 3rem;
+  color: var(--slate);
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+/* ── FEATURE CARDS ──────────────────────────────────────────────────────── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Individual feature card */
+.feature-card {
+  background: #fff;
+  border: 1px solid var(--mist);
+  border-radius: 14px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated brass line at the top of each card on hover */
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brass), var(--brass-light));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover::before {
+  transform: scaleX(1);
+}
+
+.feature-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(30, 58, 41, 0.12);
+  border-color: rgba(184, 142, 44, 0.3);
+}
+
+/* Icon circle on each feature card */
+.feature-icon {
+  width: 52px;
+  height: 52px;
+  background: var(--brass-subtle);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
+  transition: background 0.25s ease;
+}
+
+.feature-card:hover .feature-icon {
+  background: linear-gradient(135deg, var(--brass), var(--brass-light));
+}
+
+.feature-card h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+.feature-card p {
+  font-size: 0.88rem;
+  color: var(--slate);
+  line-height: 1.65;
+}
+
+/* ── ANNOUNCEMENT CARDS ─────────────────────────────────────────────────── */
+.announcement-card {
+  background: #fff;
+  border: 1px solid var(--mist);
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.announcement-card::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--brass);
+  border-radius: 0 4px 4px 0;
+}
+
+.announcement-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(30, 58, 41, 0.1);
+}
+
+.announcement-card .ann-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.announcement-card .ann-category {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--brass);
+  background: var(--brass-subtle);
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+}
+
+.announcement-card .ann-date {
+  font-size: 0.73rem;
+  color: var(--slate);
+}
+
+.announcement-card h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.announcement-card p {
+  font-size: 0.85rem;
+  color: var(--slate);
+  line-height: 1.6;
+}
+
+.announcement-card .ann-priority {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--mist);
+}
+
+/* ── APK DOWNLOAD SECTION ───────────────────────────────────────────────── */
+.apk-section {
+  padding: 5rem 1.5rem;
+  background: linear-gradient(135deg, #0d1f15, #1e3a29);
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* Decorative dots pattern */
+.apk-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(184,142,44,0.07) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.apk-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.apk-icon {
+  width: 80px;
+  height: 80px;
+  background: rgba(184,142,44,0.15);
+  border: 2px solid rgba(184,142,44,0.35);
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 2.2rem;
+  margin: 0 auto 1.5rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+.apk-section h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 2rem;
+  color: #fff;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.apk-section p {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.95rem;
+  max-width: 500px;
+  margin: 0 auto 2rem;
+  line-height: 1.7;
+}
+
+.apk-badges {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+}
+
+/* Small info badges below the APK download button */
+.apk-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 500;
+}
+
+/* ── ENHANCED FOOTER ────────────────────────────────────────────────────── */
+.site-footer {
+  background: #070f0a;
+  color: rgba(255,255,255,0.55);
+  padding: 4rem 1.5rem 2rem;
+  border-top: 1px solid rgba(184,142,44,0.2);
+}
+
+.footer-grid {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 3rem;
+  margin-bottom: 3rem;
+}
+
+/* Left brand column */
+.footer-brand .brand-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.35rem;
+  color: #fff;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.02em;
+}
+
+.footer-brand .brand-sub {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #dfb54e;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.footer-brand p {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.45);
+  max-width: 280px;
+}
+
+/* Footer link columns */
+.footer-col h4 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1rem;
+}
+
+.footer-col ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.footer-col ul li a {
+  font-size: 0.83rem;
+  color: rgba(255,255,255,0.4);
+  transition: color 0.15s ease;
+}
+
+.footer-col ul li a:hover {
+  color: #dfb54e;
+}
+
+/* Footer bottom bar */
+.footer-bottom {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.footer-bottom p {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.3);
+}
+
+.footer-bottom .footer-badge {
+  font-size: 0.72rem;
+  color: rgba(184,142,44,0.5);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ── SCROLL REVEAL — Elements animate in when they enter the viewport ────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(25px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger delay for grid children */
+.reveal-delay-1 { transition-delay: 0.1s; }
+.reveal-delay-2 { transition-delay: 0.2s; }
+.reveal-delay-3 { transition-delay: 0.3s; }
+.reveal-delay-4 { transition-delay: 0.4s; }
+.reveal-delay-5 { transition-delay: 0.5s; }
+.reveal-delay-6 { transition-delay: 0.6s; }
+
+/* ── RESPONSIVE OVERRIDES ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-section {
+    min-height: 90vh;
+    padding: 5rem 1rem 3rem;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .stats-strip-inner {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-title {
+    font-size: 1.75rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn-hero, .btn-hero-outline {
+    width: 100%;
+    max-width: 320px;
+    justify-content: center;
+  }
+
+  .stats-strip-inner {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+/* ==========================================================================
+   SECTION: JOIN NOW BUTTON & FACEBOOK-STYLE AUTH MODAL
+   Replaces separate Sign In & Register links with a unified, Facebook-inspired
+   modal containing Sign In, Sign Up / Enlist, and Forgot Password tabs.
+   ========================================================================== */
+
+.btn-join-now {
+  background: linear-gradient(135deg, #dfb54e 0%, #b88e2c 100%) !important;
+  color: #0d1f15 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.15rem !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 14px rgba(223, 181, 78, 0.35);
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.25s ease !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  cursor: pointer;
+}
+.btn-join-now:hover {
+  background: linear-gradient(135deg, #f5cc68 0%, #d4a338 100%) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(223, 181, 78, 0.5) !important;
+  color: #060e09 !important;
+}
+
+
+
+/* ==========================================================================
+   SECTION: FACEBOOK-STYLE EVENT POST CARD & PHOTO COLLAGE (SCREENSHOT MATCH)
+   Exact match to the provided screenshot:
+   - Header with avatar, title, date, globe public icon
+   - Caption with bold headline and emotional/inspirational narrative
+   - 2x2 photo collage with "+16 more" dark overlay on 4th photo
+   - Gold/brass "View All 20 Photos" button
+   - Fullscreen Lightbox viewer with Next / Previous & thumbnails
+   ========================================================================== */
+
+.fb-post-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #dddfe2;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  margin-bottom: 2rem;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.fb-post-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+.fb-post-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.fb-post-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--brass);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.fb-post-meta {
+  flex: 1;
+}
+.fb-post-author {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #050505;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.fb-post-author .verified-badge {
+  color: #1877f2;
+  font-size: 0.85rem;
+}
+.fb-post-sub {
+  font-size: 0.78rem;
+  color: #65676b;
+  margin-top: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.fb-post-body {
+  padding: 0.5rem 1.25rem 1.25rem;
+  color: #050505;
+}
+.fb-post-headline {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0d1f15;
+  margin-bottom: 0.65rem;
+  line-height: 1.35;
+}
+.fb-post-caption {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #2b3445;
+  margin-bottom: 0.65rem;
+}
+.fb-post-caption p {
+  margin-bottom: 0.65rem;
+}
+.fb-post-signoff {
+  font-style: italic;
+  color: #4b5563;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+/* 2x2 Facebook Multi-Photo Grid */
+.fb-photo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 240px 240px;
+  gap: 3px;
+  background: #000000;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+.fb-photo-tile {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+  height: 100%;
+  width: 100%;
+}
+.fb-photo-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease, filter 0.3s ease;
+  display: block;
+}
+.fb-photo-tile:hover img {
+  transform: scale(1.03);
+}
+.fb-photo-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-family: 'Oswald', 'Inter', sans-serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: background 0.2s ease;
+}
+.fb-photo-tile:hover .fb-photo-overlay {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Post footer action button */
+.fb-post-footer {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid #f0f2f5;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  background: #fbfbfb;
+}
+.fb-view-all-btn {
+  background: #dfb54e;
+  color: #0d1f15;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 2px 8px rgba(223, 181, 78, 0.35);
+  transition: all 0.2s ease;
+}
+.fb-view-all-btn:hover {
+  background: #eed07d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(223, 181, 78, 0.5);
+}
+
+/* ── Fullscreen Photo Lightbox ───────────────────────────────────────────── */
+.fb-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.94);
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+.fb-lightbox.active {
+  opacity: 1;
+  visibility: visible;
+}
+.fb-lightbox-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.fb-lightbox-counter {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #dfb54e;
+}
+.fb-lightbox-close {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  transition: background 0.2s ease;
+}
+.fb-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+.fb-lightbox-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 1rem;
+  user-select: none;
+}
+.fb-lightbox-img {
+  max-width: 90vw;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  transition: transform 0.2s ease;
+}
+.fb-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+  backdrop-filter: blur(4px);
+}
+.fb-lightbox-nav:hover {
+  background: rgba(223, 181, 78, 0.85);
+  color: #0d1f15;
+  transform: translateY(-50%) scale(1.08);
+}
+.fb-lightbox-prev {
+  left: 1.5rem;
+}
+.fb-lightbox-next {
+  right: 1.5rem;
+}
+.fb-lightbox-thumbs {
+  height: 76px;
+  background: rgba(0, 0, 0, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 8px;
+  padding: 8px 1.5rem;
+  overflow-x: auto;
+  align-items: center;
+}
+.fb-lightbox-thumb {
+  height: 56px;
+  width: 76px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  opacity: 0.5;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+.fb-lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fb-lightbox-thumb.active {
+  opacity: 1;
+  border-color: #dfb54e;
+  transform: scale(1.06);
+}
+.fb-lightbox-thumb:hover {
+  opacity: 0.9;
+}
+
+/* ── Announcement Image Card Banner ──────────────────────────────────────── */
+.ann-image-cover {
+  width: 100%;
+  height: 175px;
+  background-size: cover;
+  background-position: center;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  border-bottom: 2px solid var(--brass);
+}
+
+/* ==========================================================================
+   SECTION: CONTINUOUS ROLLING CDC LOGO MARQUEE / CAROUSEL
+   Replaces the statistics strip with an infinite, smooth rolling ribbon
+   of official Community Defense Center (CDC) logos with their names below.
+   ========================================================================== */
+
+.cdc-marquee-section {
+  background: linear-gradient(180deg, #060e09 0%, #0d1f15 50%, #09150d 100%);
+  border-top: 1px solid rgba(223, 181, 78, 0.25);
+  border-bottom: 1px solid rgba(223, 181, 78, 0.25);
+  padding: 2.25rem 0 2rem;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Vignette gradient edges to fade logos smoothly in and out */
+.cdc-marquee-section::before,
+.cdc-marquee-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+  z-index: 2;
+  pointer-events: none;
+}
+.cdc-marquee-section::before {
+  left: 0;
+  background: linear-gradient(to right, #060e09, transparent);
+}
+.cdc-marquee-section::after {
+  right: 0;
+  background: linear-gradient(to left, #060e09, transparent);
+}
+
+.cdc-marquee-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
+}
+.cdc-marquee-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 0.35rem;
+  display: inline-block;
+}
+.cdc-marquee-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1.35rem;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.marquee-container {
+  width: 100%;
+  overflow: hidden;
+  user-select: none;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: rollingMarquee 32s linear infinite;
+  gap: 2.25rem;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes rollingMarquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.cdc-logo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 210px;
+  max-width: 230px;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(223, 181, 78, 0.15);
+  border-radius: 14px;
+  transition: all 0.25s ease;
+  backdrop-filter: blur(4px);
+  flex-shrink: 0;
+}
+.cdc-logo-card:hover {
+  background: rgba(223, 181, 78, 0.08);
+  border-color: rgba(223, 181, 78, 0.45);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cdc-logo-img {
+  width: 82px;
+  height: 82px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  transition: transform 0.25s ease;
+  display: block;
+}
+.cdc-logo-card:hover .cdc-logo-img {
+  transform: scale(1.08);
+}
+
+.cdc-logo-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  margin-top: 0.75rem;
+  line-height: 1.25;
+}
+
+.cdc-logo-sub {
+  font-size: 0.68rem;
+  color: var(--brass-light);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   PAGE HERO HEADER BANNER (for About, Requirements, Benefits, Events, Gallery, Contact)
+   ========================================================================== */
+.page-header-banner {
+  position: relative;
+  background: linear-gradient(135deg, #060e09 0%, #0d1f15 40%, #122419 75%, #1a3022 100%);
+  padding: 4.5rem 1.5rem 3.5rem;
+  text-align: center;
+  overflow: hidden;
+  border-bottom: 2px solid rgba(184, 142, 44, 0.3);
+}
+
+.page-header-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(184, 142, 44, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(184, 142, 44, 0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+}
+
+.page-header-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 50% at 50% 50%, rgba(184, 142, 44, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.page-header-content {
+  position: relative;
+  z-index: 1;
+  max-width: 860px;
+  margin: 0 auto;
+  animation: fadeInUp 0.7s ease both;
+}
+
+.page-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(184, 142, 44, 0.12);
+  border: 1px solid rgba(184, 142, 44, 0.4);
+  color: #dfb54e;
+  padding: 0.35rem 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 1rem;
+}
+
+.page-header-title {
+  font-family: 'Oswald', sans-serif;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.page-header-title .accent {
+  background: linear-gradient(135deg, #dfb54e 0%, #f5d77f 50%, #dfb54e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.page-header-subtitle {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.6;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.page-breadcrumbs {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 1.25rem;
+}
+
+.page-breadcrumbs a {
+  color: #dfb54e;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.page-breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+
+
+
